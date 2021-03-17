@@ -1,6 +1,8 @@
 # hPF-MD.jl
 ## Hybrid Particle-Field Molecular Dynamics Simulation implemented in Julia
 
+This code is not fully benchmarked and finished.
+
 references:
 1. Milano, G.; Kawakatsu, T. Hybrid Particle-Field Molecular Dynamics Simulations for Dense Polymer Systems. The Journal of Chemical Physics 2009, 130 (21), 214106. https://doi.org/10.1063/1.3142103.
 2. Bore, S. L.; Cascella, M. Hamiltonian and Alias-Free Hybrid Particle–Field Molecular Dynamics. J. Chem. Phys. 2020, 153 (9), 094106. https://doi.org/10.1063/5.0020733.
