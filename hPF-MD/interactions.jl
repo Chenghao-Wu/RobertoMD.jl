@@ -8,11 +8,11 @@ function clear_forces!(forces::Vector{force})
     end
 end
 
-function clear_energy!(energy::Vector{Float64})
+function clear_energy(energy::Vector{Float64})
     return zeros(Float64,length(energy))
 end
 
-function apply_bonds!(args::system,atoms::Vector{atom},forces::Vector{force},energy::Vector{Float64},::NoBondInteractions) end
+function apply_bonds!(args::system,atoms::Vector{atom},forces::Vector{force},energy::Vector{Float64},bonds::Vector{bond},::NoBondInteractions) end
 
 struct TableBondInteractions <: BondInteraction 
     potentials::Array{Float64}
@@ -79,5 +79,5 @@ function apply_nonbonds!(args::system,atoms::Vector{atom},forces::Vector{force},
     end
     DensityatVertex!(mesh)
     Grad_DensVertex!(mesh)
-    ParticleFieldInteraction!(atoms,forces,mesh)
+    ParticleFieldInteraction!(atoms,forces,energy,mesh)
 end

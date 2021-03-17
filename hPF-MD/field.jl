@@ -93,14 +93,12 @@ function cloudincell!(position::Vector{Float64},mesh::Mesh)
     
 end
 
-#using Plots
-
 function move_front(N::Vector{Int64})
     return 0
 end
 
 function DensityatVertex!(mesh::Mesh)
-     for cellii=1:prod(mesh.N)
+    @threads for cellii=1:prod(mesh.N)
         icell,jcell,kcell=getiXYZfromCellIndex(cellii,mesh.N)
         icell_plus=icell+1
         jcell_plus=jcell+1
@@ -119,7 +117,7 @@ function DensityatVertex!(mesh::Mesh)
 end
 
 function Grad_DensVertex!(mesh::Mesh)
-    for cellii=1:prod(mesh.N)
+    @threads for cellii=1:prod(mesh.N)
         icell,jcell,kcell=getiXYZfromCellIndex(cellii,mesh.N)
 
         icell_plus=icell+1
@@ -142,14 +140,14 @@ function Grad_DensVertex!(mesh::Mesh)
         grad_x=0.5*(mesh.vertexes[dens_ii_right]-mesh.vertexes[dens_ii_left])
         grad_y=0.5*(mesh.vertexes[dens_ii_front]-mesh.vertexes[dens_ii_back])
         grad_z=0.5*(mesh.vertexes[dens_ii_up]-mesh.vertexes[dens_ii_down])
-        mesh.densgrads[dens_ii,:]=[grad_x,grad_y,grad_z]
+        mesh.densgrads[dens_ii,:] += [grad_x,grad_y,grad_z]
     end
     
 end
 
-function ParticleFieldInteraction!(atoms::Vector{atom},forces::Vector{force},mesh::Mesh)
+function ParticleFieldInteraction!(atoms::Vector{atom},forces::Vector{force},energy::Vector{Float64},mesh::Mesh)
     avg_den=length(atoms)/prod(mesh.boxsize)
-     for atomii =1:length(atoms)
+    @threads for atomii =1:length(atoms)
         ix::Int64=floor(atoms[atomii].pos[1] / mesh.edge_size[1])
         iy::Int64=floor(atoms[atomii].pos[2] / mesh.edge_size[2])
         iz::Int64=floor(atoms[atomii].pos[3] / mesh.edge_size[3])
@@ -188,13 +186,14 @@ function ParticleFieldInteraction!(atoms::Vector{atom},forces::Vector{force},mes
 
         mixing_E=0
         kappa=0.1
-        incompressibility=0
+        den_atomii=0
+        densgrads_atomii=zeros(3)
         for vertexii=1:8
-            incompressibility+=1/kappa*(mesh.vertexes[vertex_[vertexii]]*pic[vertexii]-avg_den/8)
-            
-            forces[atomii].force += -1 ./ kappa .* mesh.densgrads[vertex_[vertexii],:] .* pic[vertexii]
+            den_atomii          +=  mesh.vertexes[vertex_[vertexii]]*pic[vertexii]
+            densgrads_atomii    +=   mesh.densgrads[vertex_[vertexii],:] .* pic[vertexii]
         end
-        
+        energy[atomii] += 1/kappa*(den_atomii-avg_den)
+        forces[atomii].force += -1 ./ kappa .*densgrads_atomii
     end
    
 end

@@ -182,9 +182,8 @@ function run_hPFMD(args::system)
     trjdump_file = open(args.trjdumpfile, args.trjdumpmode)
 
     if firststep==true
-
         clear_forces!(forces_)
-        clear_energy!(energy_)
+        energy_=clear_energy(energy_)
 
         apply_bonds!(args,atoms_,forces_,energy_,bonds_,args.bondinteraction)
         apply_nonbonds!(args,atoms_,forces_,energy_,args.nonbondinteraction)
@@ -199,7 +198,7 @@ function run_hPFMD(args::system)
         apply_1st_integration!(args,atoms_,velocities_,forces_,args.thermostat)
 
         clear_forces!(forces_)
-        clear_energy!(energy_)
+        energy_=clear_energy(energy_)
 
         apply_bonds!(args,atoms_,forces_,energy_,bonds_,args.bondinteraction)
         apply_nonbonds!(args,atoms_,forces_,energy_,args.nonbondinteraction)
