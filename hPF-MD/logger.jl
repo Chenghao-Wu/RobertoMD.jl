@@ -36,7 +36,7 @@ function apply_logger!(fileO,firststep::Bool,step::Int64,velocities::Vector{velo
         end
         string_out*="\n"
         write(fileO,string_out)
-
+        flush(fileO)
         string_out=""
         if log.Timestep==true
             string_out*=string(step)*" "
@@ -55,6 +55,7 @@ function apply_logger!(fileO,firststep::Bool,step::Int64,velocities::Vector{velo
         end
         string_out*="\n"
         write(fileO,string_out)
+        flush(fileO)
     else
         string_out=""
         if log.Timestep==true
@@ -74,5 +75,6 @@ function apply_logger!(fileO,firststep::Bool,step::Int64,velocities::Vector{velo
         end
         string_out*="\n"
         write(fileO,string_out)
+        flush(fileO)
     end
 end

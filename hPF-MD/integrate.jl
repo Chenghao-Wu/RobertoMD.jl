@@ -1,6 +1,6 @@
 
 
-export BerendsenThermostat,calc_totalkineticenergy,calc_inst_temp,apply_1st_integration!,apply_2st_integration!
+export BerendsenThermostat,AndersenThermostat
 
 function calc_totalkineticenergy(atoms::Vector{atom},velocities::Vector{velocity})
     K_tot::Float64=0
@@ -37,8 +37,8 @@ function apply_1st_integration!(args::system,atoms::Vector{atom},velocities::Vec
 
     # update images
     for posii=1:length(atoms)
-        atoms[posii].image .+= RInt.( atoms[posii].pos ./ args.box)
-        atoms[posii].pos .-= args.box .* RInt.( atoms[posii].pos ./ args.box)
+        atoms[posii].image .+= fld.( atoms[posii].pos , args.box)
+        atoms[posii].pos .-= args.box .* fld.( atoms[posii].pos , args.box)
     end 
 end
 
@@ -55,4 +55,39 @@ function apply_2nd_integration!(args::system,atoms::Vector{atom},velocities::Vec
 
 end
 
+struct AndersenThermostat <: Thermostat 
+    σ::Float64
+end
 
+function apply_1st_integration!(args::system,atoms::Vector{atom},velocities::Vector{velocity},forces::Vector{force},Thermostat::AndersenThermostat) 
+    # update positions
+    for posii=1:length(atoms)
+        atoms[posii].pos .+= (velocities[posii].velocity .+ 0.5 .* forces[posii].force ./ atoms[posii].mass .* args.dt) .* args.dt
+    end 
+
+    # update velocities
+    for velii=1:length(atoms)
+        velocities[velii].velocity .+= 0.5 .* forces[velii].force ./ atoms[velii].mass .* args.dt
+    end 
+
+    # update images
+    for posii=1:length(atoms)
+        atoms[posii].image .+= fld.( atoms[posii].pos , args.box)
+        atoms[posii].pos .-= args.box .* fld.( atoms[posii].pos , args.box)
+    end 
+end
+
+function apply_2nd_integration!(args::system,atoms::Vector{atom},velocities::Vector{velocity},forces::Vector{force},Thermostat::AndersenThermostat) 
+    # update regulated velocities
+    
+    for velii=1:length(atoms)
+        rn=rand(1)
+        d = Normal(0.0, sqrt(args.temp/atoms[velii].mass))
+        if rn[1] < Thermostat.σ * args.dt
+            velocities[velii].velocity= rand(d,3)
+        else
+            velocities[velii].velocity .+= 0.5 .* forces[velii].force ./ atoms[velii].mass .* args.dt
+        end
+    end 
+
+end

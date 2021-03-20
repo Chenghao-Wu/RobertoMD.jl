@@ -150,15 +150,6 @@ function read_data(filename::AbstractString,format::AbstractString)
     return atoms_,bonds_,angles_,velocities_,forces_,energy_
 end
 
-function sample_normal_boxmuller(μ=0.0,σ=1.0)
-    d1 = Normal()
-    td1 = truncated(d1, 0, 1)
-    d2 = Normal()
-    td2 = truncated(d2, 0, 1)
-    x = cos.(2*π*rand(td1, 3)) .* sqrt.(-2*log.(rand(td2, 3)))
-    return μ.+σ.*x
-end
-
 function run_hPFMD(args::system)
     # using the same random seed in all simulations
     Random.seed!(0)
@@ -174,7 +165,8 @@ function run_hPFMD(args::system)
         velocities_=velocities_
     else
         for velocityii=1:length(velocities_)
-            velocities_[velocityii]=velocity(sample_normal_boxmuller().*sqrt(args.temp/atoms_[velocityii].mass))
+            d = Normal(0.0, sqrt(args.temp/atoms_[velocityii].mass))
+            velocities_[velocityii]=velocity(rand(d,3))
         end
     end
 
@@ -189,7 +181,7 @@ function run_hPFMD(args::system)
         apply_nonbonds!(args,atoms_,forces_,energy_,args.nonbondinteraction)
 
         apply_logger!(logger_file,firststep,1,velocities_,energy_,atoms_,args.logger)
-        apply_dump(trjdump_file,1,atoms_,forces_,velocities_,args.trajectorydump)
+        apply_dump(trjdump_file,1,args,atoms_,forces_,velocities_,args.trajectorydump)
         firststep=false
     end
 
@@ -208,7 +200,7 @@ function run_hPFMD(args::system)
         end
 
         if step_i%args.trjdumpfreq==0.0
-            apply_dump(trjdump_file,step_i,atoms_,forces_,velocities_,args.trajectorydump)
+            apply_dump(trjdump_file,step_i,args,atoms_,forces_,velocities_,args.trajectorydump)
         end
 
         apply_2nd_integration!(args,atoms_,velocities_,forces_,args.thermostat)
