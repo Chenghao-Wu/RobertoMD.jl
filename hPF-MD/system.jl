@@ -102,14 +102,13 @@ function read_data(filename::AbstractString,format::AbstractString)
     number_angles::Int64=length(angles_in)/3
     angles_=Vector{angle}(undef,number_angles)
     
-    img_zero=zeros(Int64,3)
     for atomii =1:number_atoms
         type_=1
         atomi_=Atom(frame,atomii-1) # question about the atom index?
         massi_=mass(atomi_)
         chargei_=charge(atomi_)
         current_pos=pos[1:3,atomii]./10 .- center_pos # nanometer
-        atomi=atom(type_,massi_,chargei_,current_pos,img_zero) 
+        atomi=atom(type_,massi_,chargei_,current_pos,[0,0,0]) 
         atoms_[atomii]=atomi
     end
 
@@ -130,16 +129,14 @@ function read_data(filename::AbstractString,format::AbstractString)
 
     
     velocities_=Vector{velocity}(undef,number_atoms)
-    velocity_zero=zeros(3)
     for velocityii=1:number_atoms
-        velocity_=velocity(velocity_zero)
+        velocity_=velocity(zeros(3))
         velocities_[velocityii]=velocity_
     end
 
-    force_zero=zeros(3)
     forces_=Vector{force}(undef,number_atoms)
     for forceii=1:number_atoms
-        force_=force(force_zero)
+        force_=force(zeros(3))
         forces_[forceii]=force_
     end
 
