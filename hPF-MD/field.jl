@@ -25,44 +25,41 @@ end
 
 function clear_mesh!(mesh::Mesh)
     for i=1:prod(mesh.N)
-        mesh.cells[i,:]=zeros(1,8)
+        mesh.cells[i,1]=0.0
+        mesh.cells[i,2]=0.0
+        mesh.cells[i,3]=0.0
+        mesh.cells[i,4]=0.0
+        mesh.cells[i,5]=0.0
+        mesh.cells[i,6]=0.0
+        mesh.cells[i,7]=0.0
+        mesh.cells[i,8]=0.0
         mesh.vertexes[i]=0.0
-        mesh.densgrads[i,:]=zeros(1,3) 
+        mesh.densgrads[i,1]=0.0
+        mesh.densgrads[i,2]=0.0
+        mesh.densgrads[i,3]=0.0
     end
 end
 
-function getCellIndex(ixyz::Vector{Int64},N::Vector{Int64})
-    cellindex::Int64=1+ixyz[1]+ixyz[2]*N[1]+ixyz[3]*N[1]*N[2]
+function getCellIndex(ix::Int64,iy::Int64,iz::Int64,N::Vector{Int64})
+    cellindex::Int64=1+ix+iy*N[1]+iz*N[1]*N[2]
     return cellindex
 end
 
-function getiXYZfromCellIndex(cellindex::Int64,N::Vector{Int64})
-    index_z::Int64=floor((cellindex-1)/(N[1]*N[2]))
-    index_y::Int64=floor(((cellindex-1)-N[1]*N[2]*index_z)/N[1])
-    index_x::Int64=((cellindex-1)-N[1]*N[2]*index_z)%N[1]
-    return [index_x,index_y,index_z]
+function getiXYZfromCellIndex(ixyz::Vector{Int64},cellindex::Int64,N::Vector{Int64})
+    ixyz[3]=floor((cellindex-1)/(N[1]*N[2]))
+    ixyz[2]=floor(((cellindex-1)-N[1]*N[2]*ixyz[3])/N[1])
+    ixyz[1]=((cellindex-1)-N[1]*N[2]*ixyz[3])%N[1]
+    return ixyz
 end
 
-function pbc_mesh(index::Vector{Int64},N_mesh::Vector{Int64})
-    if index[1] > N_mesh[1]-1
-        index[1]-=N_mesh[1]-1
+function pbc_mesh(x_index::Int64,N_mesh::Int64)
+    if x_index > N_mesh-1
+        x_index-=N_mesh-1
     end
-    if index[2] > N_mesh[2]-1
-        index[2]-=N_mesh[2]-1
+    if x_index < 0
+        x_index+=N_mesh-1
     end
-    if index[3] > N_mesh[3]-1
-        index[3]-=N_mesh[3]-1
-    end
-    if index[1] < 0
-        index[1]+=N_mesh[1]-1
-    end
-    if index[2] < 0
-        index[2]+=N_mesh[2]-1
-    end
-    if index[3] < 0
-        index[3]+=N_mesh[3]-1
-    end
-    return index
+    return x_index
 end
 
 function pbc_particle(position::Vector{Float64},mesh::Mesh)
@@ -84,21 +81,24 @@ function cloudincell!(position::Vector{Float64},mesh::Mesh)
     
     position=pbc_particle(position,mesh)
 
-    ix,iy,iz=floor.(Int64, position ./ mesh.edge_size)
+    ix=floor(Int64, position[1] / mesh.edge_size[1])
+    iy=floor(Int64, position[2] / mesh.edge_size[2])
+    iz=floor(Int64, position[3] / mesh.edge_size[3])
 
-    index_cell::Int64=getCellIndex([ix,iy,iz],mesh.N)
-    cellpos_low::Vector{Float64}=position .- floor.(position ./ mesh.edge_size) .* mesh.edge_size
-    #delta_pos=position .- index_cell.*mesh.edge_size
-    gridsize=mesh.edge_size[1]*mesh.edge_size[2]*mesh.edge_size[3]
+    index_cell::Int64=getCellIndex(ix,iy,iz,mesh.N)
     
-    mesh.cells[index_cell,1] += (mesh.edge_size[1]-cellpos_low[1]) * (mesh.edge_size[2]-cellpos_low[2]) * (mesh.edge_size[3]-cellpos_low[3]) / gridsize
-    mesh.cells[index_cell,2] += cellpos_low[1]                     * (mesh.edge_size[2]-cellpos_low[2]) * (mesh.edge_size[3]-cellpos_low[3]) / gridsize
-    mesh.cells[index_cell,3] += (mesh.edge_size[1]-cellpos_low[1]) * cellpos_low[2]                     * (mesh.edge_size[3]-cellpos_low[3]) / gridsize
-    mesh.cells[index_cell,4] += cellpos_low[1]                     * cellpos_low[2]                     * (mesh.edge_size[3]-cellpos_low[3]) / gridsize
-    mesh.cells[index_cell,5] += (mesh.edge_size[1]-cellpos_low[1]) * (mesh.edge_size[2]-cellpos_low[2]) *                     cellpos_low[3] / gridsize
-    mesh.cells[index_cell,6] += cellpos_low[1]                     * (mesh.edge_size[2]-cellpos_low[2]) *                     cellpos_low[3] / gridsize
-    mesh.cells[index_cell,7] += (mesh.edge_size[1]-cellpos_low[1]) * cellpos_low[2]                     *                     cellpos_low[3] / gridsize
-    mesh.cells[index_cell,8] += cellpos_low[1]                     * cellpos_low[2]                     *                     cellpos_low[3] / gridsize
+    δx=position[1] - floor(position[1] / mesh.edge_size[1]) * mesh.edge_size[1]
+    δy=position[2] - floor(position[2] / mesh.edge_size[2]) * mesh.edge_size[2]
+    δz=position[3] - floor(position[3] / mesh.edge_size[3]) * mesh.edge_size[3]
+
+    mesh.cells[index_cell,1] += (mesh.edge_size[1]-δx) * (mesh.edge_size[2]-δy) * (mesh.edge_size[3]-δz) / prod(mesh.edge_size)
+    mesh.cells[index_cell,2] += δx                     * (mesh.edge_size[2]-δy) * (mesh.edge_size[3]-δz) / prod(mesh.edge_size)
+    mesh.cells[index_cell,3] += (mesh.edge_size[1]-δx) * δy                     * (mesh.edge_size[3]-δz) / prod(mesh.edge_size)
+    mesh.cells[index_cell,4] += δx                     * δy                     * (mesh.edge_size[3]-δz) / prod(mesh.edge_size)
+    mesh.cells[index_cell,5] += (mesh.edge_size[1]-δx) * (mesh.edge_size[2]-δy) *                     δz / prod(mesh.edge_size)
+    mesh.cells[index_cell,6] += δx                     * (mesh.edge_size[2]-δy) *                     δz / prod(mesh.edge_size)
+    mesh.cells[index_cell,7] += (mesh.edge_size[1]-δx) * δy                     *                     δz / prod(mesh.edge_size)
+    mesh.cells[index_cell,8] += δx                     * δy                     *                     δz / prod(mesh.edge_size)
     
 end
 
@@ -107,49 +107,59 @@ function move_front(N::Vector{Int64})
 end
 
 function DensityatVertex!(mesh::Mesh)
+    ixyz=zeros(Int64,3)
     for cellii=1:prod(mesh.N)
-        icell,jcell,kcell=getiXYZfromCellIndex(cellii,mesh.N)
-        icell_plus=icell+1
-        jcell_plus=jcell+1
-        kcell_plus=kcell+1
 
-        mesh.vertexes[getCellIndex(pbc_mesh([icell,jcell,kcell],mesh.N),mesh.N)]                 +=      mesh.cells[cellii,1]
-        mesh.vertexes[getCellIndex(pbc_mesh([icell_plus,jcell,kcell],mesh.N),mesh.N)]            +=      mesh.cells[cellii,2]
-        mesh.vertexes[getCellIndex(pbc_mesh([icell,jcell_plus,kcell],mesh.N),mesh.N)]            +=      mesh.cells[cellii,3]
-        mesh.vertexes[getCellIndex(pbc_mesh([icell_plus,jcell_plus,kcell],mesh.N),mesh.N)]       +=      mesh.cells[cellii,4]
-        mesh.vertexes[getCellIndex(pbc_mesh([icell,jcell,kcell_plus],mesh.N),mesh.N)]            +=      mesh.cells[cellii,5]
-        mesh.vertexes[getCellIndex(pbc_mesh([icell_plus,jcell,kcell_plus],mesh.N),mesh.N)]       +=      mesh.cells[cellii,6]
-        mesh.vertexes[getCellIndex(pbc_mesh([icell,jcell_plus,kcell_plus],mesh.N),mesh.N)]       +=      mesh.cells[cellii,7]
-        mesh.vertexes[getCellIndex(pbc_mesh([icell_plus,jcell_plus,kcell_plus],mesh.N),mesh.N)]  +=      mesh.cells[cellii,8]
+        icell,jcell,kcell=getiXYZfromCellIndex(ixyz,cellii,mesh.N)
+
+        icell=pbc_mesh(icell,mesh.N[1])
+        jcell=pbc_mesh(jcell,mesh.N[2])
+        kcell=pbc_mesh(kcell,mesh.N[3])
+
+        icell_plus=pbc_mesh(icell+1,mesh.N[1])
+        jcell_plus=pbc_mesh(jcell+1,mesh.N[1])
+        kcell_plus=pbc_mesh(kcell+1,mesh.N[1])
+
+        mesh.vertexes[getCellIndex(icell,jcell,kcell,mesh.N)]                 +=      mesh.cells[cellii,1]
+        mesh.vertexes[getCellIndex(icell_plus,jcell,kcell,mesh.N)]            +=      mesh.cells[cellii,2]
+        mesh.vertexes[getCellIndex(icell,jcell_plus,kcell,mesh.N)]            +=      mesh.cells[cellii,3]
+        mesh.vertexes[getCellIndex(icell_plus,jcell_plus,kcell,mesh.N)]       +=      mesh.cells[cellii,4]
+        mesh.vertexes[getCellIndex(icell,jcell,kcell_plus,mesh.N)]            +=      mesh.cells[cellii,5]
+        mesh.vertexes[getCellIndex(icell_plus,jcell,kcell_plus,mesh.N)]       +=      mesh.cells[cellii,6]
+        mesh.vertexes[getCellIndex(icell,jcell_plus,kcell_plus,mesh.N)]       +=      mesh.cells[cellii,7]
+        mesh.vertexes[getCellIndex(icell_plus,jcell_plus,kcell_plus,mesh.N)]  +=      mesh.cells[cellii,8]
     end
-    
 end
 
 function Grad_DensVertex!(mesh::Mesh)
+    ixyz=zeros(Int64,3)
     for cellii=1:prod(mesh.N)
-        icell,jcell,kcell=getiXYZfromCellIndex(cellii,mesh.N)
 
-        icell_plus=icell+1
-        jcell_plus=jcell+1
-        kcell_plus=kcell+1
+        icell,jcell,kcell=getiXYZfromCellIndex(ixyz,cellii,mesh.N)
 
-        icell_minus=icell-1
-        jcell_minus=jcell-1
-        kcell_minus=kcell-1
+        icell_plus=pbc_mesh(icell+1,mesh.N[1])
+        jcell_plus=pbc_mesh(jcell+1,mesh.N[2])
+        kcell_plus=pbc_mesh(kcell+1,mesh.N[3])
 
-        dens_ii         = getCellIndex(pbc_mesh([icell,jcell,kcell],mesh.N),mesh.N)
-        dens_ii_right   = getCellIndex(pbc_mesh([icell_plus,jcell,kcell],mesh.N),mesh.N)
-        dens_ii_left    = getCellIndex(pbc_mesh([icell_minus,jcell,kcell],mesh.N),mesh.N)
-        dens_ii_front   = getCellIndex(pbc_mesh([icell,jcell_plus,kcell],mesh.N),mesh.N)
-        dens_ii_back    = getCellIndex(pbc_mesh([icell,jcell_minus,kcell],mesh.N),mesh.N)
-        dens_ii_up      = getCellIndex(pbc_mesh([icell,jcell,kcell_plus],mesh.N),mesh.N)
-        dens_ii_down    = getCellIndex(pbc_mesh([icell,jcell,kcell_minus],mesh.N),mesh.N)
+        icell_minus=pbc_mesh(icell-1,mesh.N[1])
+        jcell_minus=pbc_mesh(jcell-1,mesh.N[2])
+        kcell_minus=pbc_mesh(kcell-1,mesh.N[3])
+
+        dens_ii         = getCellIndex(icell,jcell,kcell,mesh.N)
+        dens_ii_right   = getCellIndex(icell_plus,jcell,kcell,mesh.N)
+        dens_ii_left    = getCellIndex(icell_minus,jcell,kcell,mesh.N)
+        dens_ii_front   = getCellIndex(icell,jcell_plus,kcell,mesh.N)
+        dens_ii_back    = getCellIndex(icell,jcell_minus,kcell,mesh.N)
+        dens_ii_up      = getCellIndex(icell,jcell,kcell_plus,mesh.N)
+        dens_ii_down    = getCellIndex(icell,jcell,kcell_minus,mesh.N)
 
         
         grad_x=0.5*(mesh.vertexes[dens_ii_right]-mesh.vertexes[dens_ii_left])
         grad_y=0.5*(mesh.vertexes[dens_ii_front]-mesh.vertexes[dens_ii_back])
         grad_z=0.5*(mesh.vertexes[dens_ii_up]-mesh.vertexes[dens_ii_down])
-        mesh.densgrads[dens_ii,:] += [grad_x,grad_y,grad_z]
+        mesh.densgrads[dens_ii,1] += grad_x
+        mesh.densgrads[dens_ii,2] += grad_y
+        mesh.densgrads[dens_ii,3] += grad_z
     end
     
 end

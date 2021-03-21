@@ -4,12 +4,16 @@ export TableBondInteractions,OriginalhPFInteractions
 
 function clear_forces!(forces::Vector{force})
     for forceii=1:length(forces)
-        forces[forceii].force=[0.0,0.0,0.0]
+        forces[forceii].force[1]=0.0
+        forces[forceii].force[2]=0.0
+        forces[forceii].force[3]=0.0
     end
 end
 
-function clear_energy(energy::Vector{Float64})
-    return zeros(Float64,length(energy))
+function clear_energy!(energy::Vector{Float64})
+    for i=1:length(energy)
+        energy[i]=0.0
+    end
 end
 
 function apply_bonds!(args::system,atoms::Vector{atom},forces::Vector{force},energy::Vector{Float64},bonds::Vector{bond},::NoBondInteractions) end
@@ -77,47 +81,67 @@ function ParticleFieldInteraction!(atoms::Vector{atom},forces::Vector{force},ene
     avg_den=length(atoms)/prod(mesh.boxsize)
     pic=zeros(8)
     vertex_=zeros(Int64,8)
+    densgrads_atomii=zeros(3)
     for atomii =1:length(atoms)
+
         ix::Int64=floor(atoms[atomii].pos[1] / mesh.edge_size[1])
         iy::Int64=floor(atoms[atomii].pos[2] / mesh.edge_size[2])
         iz::Int64=floor(atoms[atomii].pos[3] / mesh.edge_size[3])
-        index_cell::Int64=getCellIndex([ix,iy,iz],mesh.N)
-        cellpos_low::Vector{Float64}=atoms[atomii].pos .- floor.(atoms[atomii].pos ./ mesh.edge_size) .* mesh.edge_size
 
-        pic[1]= (mesh.edge_size[1]-cellpos_low[1]) * (mesh.edge_size[2]-cellpos_low[2]) * (mesh.edge_size[3]-cellpos_low[3]) / prod(mesh.edge_size)
-        pic[2]= cellpos_low[1]                     * (mesh.edge_size[2]-cellpos_low[2]) * (mesh.edge_size[3]-cellpos_low[3]) / prod(mesh.edge_size)
-        pic[3]= (mesh.edge_size[1]-cellpos_low[1]) * cellpos_low[2]                     * (mesh.edge_size[3]-cellpos_low[3]) / prod(mesh.edge_size)
-        pic[4]= cellpos_low[1]                     * cellpos_low[2]                     * (mesh.edge_size[3]-cellpos_low[3]) / prod(mesh.edge_size)
-        pic[5]= (mesh.edge_size[1]-cellpos_low[1]) * (mesh.edge_size[2]-cellpos_low[2]) *                     cellpos_low[3] / prod(mesh.edge_size)
-        pic[6]= cellpos_low[1]                     * (mesh.edge_size[2]-cellpos_low[2]) *                     cellpos_low[3] / prod(mesh.edge_size)
-        pic[7]= (mesh.edge_size[1]-cellpos_low[1]) * cellpos_low[2]                     *                     cellpos_low[3] / prod(mesh.edge_size)
-        pic[8]= cellpos_low[1]                     * cellpos_low[2]                     *                     cellpos_low[3] / prod(mesh.edge_size)
+        index_cell::Int64=getCellIndex(ix,iy,iz,mesh.N)
+
+        δx=atoms[atomii].pos[1] - floor(atoms[atomii].pos[1] / mesh.edge_size[1]) * mesh.edge_size[1]
+        δy=atoms[atomii].pos[2] - floor(atoms[atomii].pos[2] / mesh.edge_size[2]) * mesh.edge_size[2]
+        δz=atoms[atomii].pos[3] - floor(atoms[atomii].pos[3] / mesh.edge_size[3]) * mesh.edge_size[3]
+
+        pic[1]= (mesh.edge_size[1]-δx) * (mesh.edge_size[2]-δy) * (mesh.edge_size[3]-δz) / prod(mesh.edge_size)
+        pic[2]= δx                     * (mesh.edge_size[2]-δy) * (mesh.edge_size[3]-δz) / prod(mesh.edge_size)
+        pic[3]= (mesh.edge_size[1]-δx) * δy                     * (mesh.edge_size[3]-δz) / prod(mesh.edge_size)
+        pic[4]= δx                     * δy                     * (mesh.edge_size[3]-δz) / prod(mesh.edge_size)
+        pic[5]= (mesh.edge_size[1]-δx) * (mesh.edge_size[2]-δy) *                     δz / prod(mesh.edge_size)
+        pic[6]= δx                     * (mesh.edge_size[2]-δy) *                     δz / prod(mesh.edge_size)
+        pic[7]= (mesh.edge_size[1]-δx) * δy                     *                     δz / prod(mesh.edge_size)
+        pic[8]= δx                     * δy                     *                     δz / prod(mesh.edge_size)
 
         icell=ix
         jcell=iy
         kcell=iz
-        icell_plus=ix+1
-        jcell_plus=iy+1
-        kcell_plus=iz+1
 
-        
-        vertex_[1]=getCellIndex(pbc_mesh([icell,jcell,kcell],mesh.N),mesh.N)                 
-        vertex_[2]=getCellIndex(pbc_mesh([icell_plus,jcell,kcell],mesh.N),mesh.N)            
-        vertex_[3]=getCellIndex(pbc_mesh([icell,jcell_plus,kcell],mesh.N),mesh.N)            
-        vertex_[4]=getCellIndex(pbc_mesh([icell_plus,jcell_plus,kcell],mesh.N),mesh.N)       
-        vertex_[5]=getCellIndex(pbc_mesh([icell,jcell,kcell_plus],mesh.N),mesh.N)            
-        vertex_[6]=getCellIndex(pbc_mesh([icell_plus,jcell,kcell_plus],mesh.N),mesh.N)       
-        vertex_[7]=getCellIndex(pbc_mesh([icell,jcell_plus,kcell_plus],mesh.N),mesh.N)       
-        vertex_[8]=getCellIndex(pbc_mesh([icell_plus,jcell_plus,kcell_plus],mesh.N),mesh.N)  
+        icell=pbc_mesh(icell,mesh.N[1])
+        jcell=pbc_mesh(jcell,mesh.N[2])
+        kcell=pbc_mesh(kcell,mesh.N[3])
+
+        icell_plus=pbc_mesh(icell+1,mesh.N[1])
+        jcell_plus=pbc_mesh(jcell+1,mesh.N[1])
+        kcell_plus=pbc_mesh(kcell+1,mesh.N[1])
+
+        vertex_[1]=getCellIndex(icell,jcell,kcell,mesh.N)                 
+        vertex_[2]=getCellIndex(icell_plus,jcell,kcell,mesh.N)            
+        vertex_[3]=getCellIndex(icell,jcell_plus,kcell,mesh.N)            
+        vertex_[4]=getCellIndex(icell_plus,jcell_plus,kcell,mesh.N)       
+        vertex_[5]=getCellIndex(icell,jcell,kcell_plus,mesh.N)            
+        vertex_[6]=getCellIndex(icell_plus,jcell,kcell_plus,mesh.N)       
+        vertex_[7]=getCellIndex(icell,jcell_plus,kcell_plus,mesh.N)       
+        vertex_[8]=getCellIndex(icell_plus,jcell_plus,kcell_plus,mesh.N)  
 
         den_atomii=0
-        densgrads_atomii=zeros(3)
+        
+        densgrads_atomii[1]=0.0
+        densgrads_atomii[2]=0.0
+        densgrads_atomii[3]=0.0
+
         for vertexii=1:8
             den_atomii          +=  mesh.vertexes[vertex_[vertexii]]*pic[vertexii]
-            densgrads_atomii    +=   mesh.densgrads[vertex_[vertexii],:] .* pic[vertexii]
+            densgrads_atomii[1]    +=   mesh.densgrads[vertex_[vertexii],1] * pic[vertexii]
+            densgrads_atomii[2]    +=   mesh.densgrads[vertex_[vertexii],2] * pic[vertexii]
+            densgrads_atomii[3]    +=   mesh.densgrads[vertex_[vertexii],3] * pic[vertexii]
         end
+
         energy[atomii] += 1/hPF.κ*(den_atomii-avg_den)/avg_den
-        forces[atomii].force += -1 ./ hPF.κ .*densgrads_atomii/avg_den
+
+        forces[atomii].force[1] += -1 / hPF.κ *densgrads_atomii[1]/avg_den
+        forces[atomii].force[2] += -1 / hPF.κ *densgrads_atomii[2]/avg_den
+        forces[atomii].force[3] += -1 / hPF.κ *densgrads_atomii[3]/avg_den
     end
    
 end

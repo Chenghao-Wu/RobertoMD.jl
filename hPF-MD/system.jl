@@ -25,11 +25,6 @@ mutable struct force
     force::Vector{Float64}
 end
 
-struct topology
-    bonds::Array{Vector{Int64}}
-    angles::Array{Vector{Int64}}
-end
-
 struct bond
     atom_1::Int64
     atom_2::Int64
@@ -107,13 +102,14 @@ function read_data(filename::AbstractString,format::AbstractString)
     number_angles::Int64=length(angles_in)/3
     angles_=Vector{angle}(undef,number_angles)
     
+    img_zero=zeros(Int64,3)
     for atomii =1:number_atoms
         type_=1
         atomi_=Atom(frame,atomii-1) # question about the atom index?
         massi_=mass(atomi_)
         chargei_=charge(atomi_)
         current_pos=pos[1:3,atomii]./10 .- center_pos # nanometer
-        atomi=atom(type_,massi_,chargei_,current_pos,[0,0,0]) 
+        atomi=atom(type_,massi_,chargei_,current_pos,img_zero) 
         atoms_[atomii]=atomi
     end
 
@@ -134,14 +130,16 @@ function read_data(filename::AbstractString,format::AbstractString)
 
     
     velocities_=Vector{velocity}(undef,number_atoms)
+    velocity_zero=zeros(3)
     for velocityii=1:number_atoms
-        velocity_=velocity([0.0,0.0,0.0])
+        velocity_=velocity(velocity_zero)
         velocities_[velocityii]=velocity_
     end
 
+    force_zero=zeros(3)
     forces_=Vector{force}(undef,number_atoms)
     for forceii=1:number_atoms
-        force_=force([0.0,0.0,0.0])
+        force_=force(force_zero)
         forces_[forceii]=force_
     end
 
@@ -175,7 +173,7 @@ function run_hPFMD(args::system)
 
     if firststep==true
         clear_forces!(forces_)
-        energy_=clear_energy(energy_)
+        clear_energy!(energy_)
 
         apply_bonds!(args,atoms_,forces_,energy_,bonds_,args.bondinteraction)
         apply_nonbonds!(args,atoms_,forces_,energy_,args.nonbondinteraction)
@@ -190,7 +188,7 @@ function run_hPFMD(args::system)
         apply_1st_integration!(args,atoms_,velocities_,forces_,args.thermostat)
 
         clear_forces!(forces_)
-        energy_=clear_energy(energy_)
+        clear_energy!(energy_)
 
         apply_bonds!(args,atoms_,forces_,energy_,bonds_,args.bondinteraction)
         apply_nonbonds!(args,atoms_,forces_,energy_,args.nonbondinteraction)
