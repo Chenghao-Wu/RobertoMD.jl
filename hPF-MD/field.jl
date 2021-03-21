@@ -1,4 +1,14 @@
 
+export Mesh,clear_mesh!,init_mesh
+
+struct Mesh
+    edge_size::Array{Float64,1}
+    N::Array{Int64,1}
+    cells::Array{Float64,2}
+    vertexes::Array{Float64,1}
+    densgrads::Array{Float64,2}
+    boxsize::Array{Float64,1}
+end
 
 function init_mesh(boxsize::Vector{Float64},Nx::Int64,Ny::Int64,Nz::Int64)
     egde_x=boxsize[1]/Nx
@@ -13,13 +23,12 @@ function init_mesh(boxsize::Vector{Float64},Nx::Int64,Ny::Int64,Nz::Int64)
     return Mesh(edge_size,N,cells,vertexes,densgrads,boxsize)
 end
 
-struct Mesh
-    edge_size::Array{Float64}
-    N::Array{Int64}
-    cells::Array{Float64,2}
-    vertexes::Array{Float64}
-    densgrads::Array{Float64}
-    boxsize::Array{Float64}
+function clear_mesh!(mesh::Mesh)
+    for i=1:prod(mesh.N)
+        mesh.cells[i,:]=zeros(1,8)
+        mesh.vertexes[i]=0.0
+        mesh.densgrads[i,:]=zeros(1,3) 
+    end
 end
 
 function getCellIndex(ixyz::Vector{Int64},N::Vector{Int64})
@@ -98,7 +107,7 @@ function move_front(N::Vector{Int64})
 end
 
 function DensityatVertex!(mesh::Mesh)
-    @threads for cellii=1:prod(mesh.N)
+    for cellii=1:prod(mesh.N)
         icell,jcell,kcell=getiXYZfromCellIndex(cellii,mesh.N)
         icell_plus=icell+1
         jcell_plus=jcell+1
@@ -117,7 +126,7 @@ function DensityatVertex!(mesh::Mesh)
 end
 
 function Grad_DensVertex!(mesh::Mesh)
-    @threads for cellii=1:prod(mesh.N)
+    for cellii=1:prod(mesh.N)
         icell,jcell,kcell=getiXYZfromCellIndex(cellii,mesh.N)
 
         icell_plus=icell+1
@@ -143,4 +152,10 @@ function Grad_DensVertex!(mesh::Mesh)
         mesh.densgrads[dens_ii,:] += [grad_x,grad_y,grad_z]
     end
     
+end
+
+function gaussian_filter(σ::Float64,pos::Vector{Float64},pos2::Float64)
+    Δr ::Vector{Float64} = pos .- pos2
+    gauss::Vector{Float64}=1 ./ (sqrt(2 * π) * σ) .* exp.(-1 .* (Δr ./ 2*σ).^2)
+    return gauss
 end

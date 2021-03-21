@@ -15,7 +15,7 @@ end
 function apply_bonds!(args::system,atoms::Vector{atom},forces::Vector{force},energy::Vector{Float64},bonds::Vector{bond},::NoBondInteractions) end
 
 struct TableBondInteractions <: BondInteraction 
-    potentials::Array{Float64}
+    potentials::Array{Float64,1}
     δ::Float64
 end
 
@@ -69,30 +69,29 @@ end
 
 struct OriginalhPFInteractions <: NonBondInteraction 
     κ::Float64
-    N::Vector{Int64}
+    mesh::Mesh
 end
 
 
 function ParticleFieldInteraction!(atoms::Vector{atom},forces::Vector{force},energy::Vector{Float64},mesh::Mesh,hPF::OriginalhPFInteractions)
     avg_den=length(atoms)/prod(mesh.boxsize)
-    @threads for atomii =1:length(atoms)
+    pic=zeros(8)
+    vertex_=zeros(Int64,8)
+    for atomii =1:length(atoms)
         ix::Int64=floor(atoms[atomii].pos[1] / mesh.edge_size[1])
         iy::Int64=floor(atoms[atomii].pos[2] / mesh.edge_size[2])
         iz::Int64=floor(atoms[atomii].pos[3] / mesh.edge_size[3])
         index_cell::Int64=getCellIndex([ix,iy,iz],mesh.N)
         cellpos_low::Vector{Float64}=atoms[atomii].pos .- floor.(atoms[atomii].pos ./ mesh.edge_size) .* mesh.edge_size
-        
-        gridsize=mesh.edge_size[1]*mesh.edge_size[2]*mesh.edge_size[3]
-        
-        pic=zeros(8)
-        pic[1]= (mesh.edge_size[1]-cellpos_low[1]) * (mesh.edge_size[2]-cellpos_low[2]) * (mesh.edge_size[3]-cellpos_low[3]) / gridsize
-        pic[2]= cellpos_low[1]                     * (mesh.edge_size[2]-cellpos_low[2]) * (mesh.edge_size[3]-cellpos_low[3]) / gridsize
-        pic[3]= (mesh.edge_size[1]-cellpos_low[1]) * cellpos_low[2]                     * (mesh.edge_size[3]-cellpos_low[3]) / gridsize
-        pic[4]= cellpos_low[1]                     * cellpos_low[2]                     * (mesh.edge_size[3]-cellpos_low[3]) / gridsize
-        pic[5]= (mesh.edge_size[1]-cellpos_low[1]) * (mesh.edge_size[2]-cellpos_low[2]) *                     cellpos_low[3] / gridsize
-        pic[6]= cellpos_low[1]                     * (mesh.edge_size[2]-cellpos_low[2]) *                     cellpos_low[3] / gridsize
-        pic[7]= (mesh.edge_size[1]-cellpos_low[1]) * cellpos_low[2]                     *                     cellpos_low[3] / gridsize
-        pic[8]= cellpos_low[1]                     * cellpos_low[2]                     *                     cellpos_low[3] / gridsize
+
+        pic[1]= (mesh.edge_size[1]-cellpos_low[1]) * (mesh.edge_size[2]-cellpos_low[2]) * (mesh.edge_size[3]-cellpos_low[3]) / prod(mesh.edge_size)
+        pic[2]= cellpos_low[1]                     * (mesh.edge_size[2]-cellpos_low[2]) * (mesh.edge_size[3]-cellpos_low[3]) / prod(mesh.edge_size)
+        pic[3]= (mesh.edge_size[1]-cellpos_low[1]) * cellpos_low[2]                     * (mesh.edge_size[3]-cellpos_low[3]) / prod(mesh.edge_size)
+        pic[4]= cellpos_low[1]                     * cellpos_low[2]                     * (mesh.edge_size[3]-cellpos_low[3]) / prod(mesh.edge_size)
+        pic[5]= (mesh.edge_size[1]-cellpos_low[1]) * (mesh.edge_size[2]-cellpos_low[2]) *                     cellpos_low[3] / prod(mesh.edge_size)
+        pic[6]= cellpos_low[1]                     * (mesh.edge_size[2]-cellpos_low[2]) *                     cellpos_low[3] / prod(mesh.edge_size)
+        pic[7]= (mesh.edge_size[1]-cellpos_low[1]) * cellpos_low[2]                     *                     cellpos_low[3] / prod(mesh.edge_size)
+        pic[8]= cellpos_low[1]                     * cellpos_low[2]                     *                     cellpos_low[3] / prod(mesh.edge_size)
 
         icell=ix
         jcell=iy
@@ -101,7 +100,7 @@ function ParticleFieldInteraction!(atoms::Vector{atom},forces::Vector{force},ene
         jcell_plus=iy+1
         kcell_plus=iz+1
 
-        vertex_=zeros(Int64,8)
+        
         vertex_[1]=getCellIndex(pbc_mesh([icell,jcell,kcell],mesh.N),mesh.N)                 
         vertex_[2]=getCellIndex(pbc_mesh([icell_plus,jcell,kcell],mesh.N),mesh.N)            
         vertex_[3]=getCellIndex(pbc_mesh([icell,jcell_plus,kcell],mesh.N),mesh.N)            
@@ -124,11 +123,11 @@ function ParticleFieldInteraction!(atoms::Vector{atom},forces::Vector{force},ene
 end
 
 function apply_nonbonds!(args::system,atoms::Vector{atom},forces::Vector{force},energy::Vector{Float64},hPF::OriginalhPFInteractions)
-    mesh=init_mesh(args.box,hPF.N[1],hPF.N[2],hPF.N[3])
-     for atomii=1:length(atoms)
-        cloudincell!(atoms[atomii].pos,mesh)
+    clear_mesh!(hPF.mesh)
+    for atomii=1:length(atoms)
+        cloudincell!(atoms[atomii].pos,hPF.mesh)
     end
-    DensityatVertex!(mesh)
-    Grad_DensVertex!(mesh)
-    ParticleFieldInteraction!(atoms,forces,energy,mesh,hPF)
+    DensityatVertex!(hPF.mesh)
+    Grad_DensVertex!(hPF.mesh)
+    ParticleFieldInteraction!(atoms,forces,energy,hPF.mesh,hPF)
 end
