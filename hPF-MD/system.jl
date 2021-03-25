@@ -129,15 +129,15 @@ function read_data(filename::AbstractString,format::AbstractString)
 
     
     velocities_=Vector{velocity}(undef,number_atoms)
+    velocity_init=zeros(3)
     for velocityii=1:number_atoms
-        velocity_=velocity(zeros(3))
-        velocities_[velocityii]=velocity_
+        velocities_[velocityii]=velocity(zeros(3))
     end
 
     forces_=Vector{force}(undef,number_atoms)
+    force_init=zeros(3)
     for forceii=1:number_atoms
-        force_=force(zeros(3))
-        forces_[forceii]=force_
+        forces_[forceii]=force(zeros(3))
     end
 
     energy_=zeros(Float64,number_atoms)

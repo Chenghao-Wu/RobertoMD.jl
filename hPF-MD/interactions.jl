@@ -1,5 +1,5 @@
 
-export TableBondInteractions,OriginalhPFInteractions
+export TableBondInteractions,OriginalhPFInteractions,FENEBondInteractions
 
 
 function clear_forces!(forces::Vector{force})
@@ -65,6 +65,47 @@ function apply_bonds!(args::system,atoms::Vector{atom},forces::Vector{force},ene
         force_=bondtable.potentials[index_bond,4]
         force_divr = force_/r
         
+        # calculate forces
+        forces[bonds[bondii].atom_1+1].force .+= delta_d .* force_divr
+        forces[bonds[bondii].atom_2+1].force .+= -delta_d .* force_divr
+    end
+end
+
+struct FENEBondInteractions <: BondInteraction 
+    K::Float64 #    (energy/distance^2)
+    R0::Float64 #   (distance)
+    ϵ::Float64 #    (energy)
+    σ::Float64 #    (distance)
+end
+
+function apply_bonds!(args::system,atoms::Vector{atom},forces::Vector{force},energy::Vector{Float64},bonds::Vector{bond},fenebond::FENEBondInteractions) 
+
+    for bondii=1:length(bonds)
+        delta_d = atoms[bonds[bondii].atom_1+1].pos .- atoms[bonds[bondii].atom_2+1].pos
+
+        # consider pbc
+        delta_d .-= args.box .* RInt.( delta_d ./ args.box)
+
+        r = (delta_d[1]^2+delta_d[2]^2+delta_d[3]^2)^0.5
+        rsq=r^2
+
+        r0sq=fenebond.R0*fenebond.R0
+        rlogarg=1-rsq/r0sq
+
+        fbond = -fenebond.K/rlogarg
+
+
+        if rsq<fenebond.σ^2
+            sr2=fenebond.σ^2/rsq
+            sr6=sr2*sr2*sr2
+            force_divr += 48*fenebond.ϵ*sr6*(sr6-0.5)/rsq
+        end
+
+        E=-0.5*fenebond.K*fenebond.R0^2*log(1-(r/fenebond.R0)^2)+4*fenebond.ϵ*((fenebond.σ/r)^12-(fenebond.σ/r)^6)+fenebond.ϵ
+
+        energy[bonds[bondii].atom_1+1]+=E*0.5
+        energy[bonds[bondii].atom_2+1]+=E*0.5
+
         # calculate forces
         forces[bonds[bondii].atom_1+1].force .+= delta_d .* force_divr
         forces[bonds[bondii].atom_2+1].force .+= -delta_d .* force_divr

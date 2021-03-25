@@ -30,9 +30,9 @@ end
 function apply_1st_integration!(args::system,atoms::Vector{atom},velocities::Vector{velocity},forces::Vector{force},Thermostat::BerendsenThermostat) 
     # update positions
     for posii=1:length(atoms)
-        atoms[posii].pos[1] += (velocities[posii].velocity[1] + 0.5 * forces[posii].force[1] / atoms[posii].mass .* args.dt) .* args.dt
-        atoms[posii].pos[2] += (velocities[posii].velocity[2] + 0.5 * forces[posii].force[2] / atoms[posii].mass .* args.dt) .* args.dt
-        atoms[posii].pos[3] += (velocities[posii].velocity[3] + 0.5 * forces[posii].force[3] / atoms[posii].mass .* args.dt) .* args.dt
+        atoms[posii].pos[1] += (velocities[posii].velocity[1] + 0.5 * forces[posii].force[1] / atoms[posii].mass * args.dt) * args.dt
+        atoms[posii].pos[2] += (velocities[posii].velocity[2] + 0.5 * forces[posii].force[2] / atoms[posii].mass * args.dt) * args.dt
+        atoms[posii].pos[3] += (velocities[posii].velocity[3] + 0.5 * forces[posii].force[3] / atoms[posii].mass * args.dt) * args.dt
     end 
 
     # update velocities
@@ -63,7 +63,7 @@ function apply_2nd_integration!(args::system,atoms::Vector{atom},velocities::Vec
     for velii=1:length(atoms)
         velocities[velii].velocity[1] = (velocities[velii].velocity[1] +0.5 * forces[velii].force[1] / atoms[velii].mass * args.dt) * scalT
         velocities[velii].velocity[2] = (velocities[velii].velocity[2] +0.5 * forces[velii].force[2] / atoms[velii].mass * args.dt) * scalT
-        velocities[velii].velocity[3] = (velocities[velii].velocity[3] +0.5 * forces[velii].force[3] / atoms[velii].mass * args.dt) .* scalT
+        velocities[velii].velocity[3] = (velocities[velii].velocity[3] +0.5 * forces[velii].force[3] / atoms[velii].mass * args.dt) * scalT
     end 
 
 end
@@ -75,9 +75,9 @@ end
 function apply_1st_integration!(args::system,atoms::Vector{atom},velocities::Vector{velocity},forces::Vector{force},Thermostat::AndersenThermostat) 
     # update positions
     for posii=1:length(atoms)
-        atoms[posii].pos[1] += (velocities[posii].velocity[1] + 0.5 * forces[posii].force[1] / atoms[posii].mass .* args.dt) .* args.dt
-        atoms[posii].pos[2] += (velocities[posii].velocity[2] + 0.5 * forces[posii].force[2] / atoms[posii].mass .* args.dt) .* args.dt
-        atoms[posii].pos[3] += (velocities[posii].velocity[3] + 0.5 * forces[posii].force[3] / atoms[posii].mass .* args.dt) .* args.dt
+        atoms[posii].pos[1] += (velocities[posii].velocity[1] + 0.5 * forces[posii].force[1] / atoms[posii].mass * args.dt) * args.dt
+        atoms[posii].pos[2] += (velocities[posii].velocity[2] + 0.5 * forces[posii].force[2] / atoms[posii].mass * args.dt) * args.dt
+        atoms[posii].pos[3] += (velocities[posii].velocity[3] + 0.5 * forces[posii].force[3] / atoms[posii].mass * args.dt) * args.dt
     end 
 
     # update velocities
@@ -100,16 +100,15 @@ end
 
 function apply_2nd_integration!(args::system,atoms::Vector{atom},velocities::Vector{velocity},forces::Vector{force},Thermostat::AndersenThermostat) 
     # update regulated velocities
-    
     for velii=1:length(atoms)
-        rn=rand(1)
         d = Normal(0.0, sqrt(args.temp/atoms[velii].mass))
+        rn=rand(1)
         if rn[1] < Thermostat.σ * args.dt
-            velocities[velii].velocity = rand(d,3)
+            velocities[velii].velocity = rand(d,3)#randn(rng,Float64) * sqrt(args.temp/atoms[velii].mass)
         else
-            velocities[velii].velocity[1] += 0.5 * forces[velii].force[1] / atoms[velii].mass .* args.dt
-            velocities[velii].velocity[2] += 0.5 * forces[velii].force[2] / atoms[velii].mass .* args.dt
-            velocities[velii].velocity[3] += 0.5 * forces[velii].force[3] / atoms[velii].mass .* args.dt
+            velocities[velii].velocity[1] += 0.5 * forces[velii].force[1] / atoms[velii].mass * args.dt
+            velocities[velii].velocity[2] += 0.5 * forces[velii].force[2] / atoms[velii].mass * args.dt
+            velocities[velii].velocity[3] += 0.5 * forces[velii].force[3] / atoms[velii].mass * args.dt
         end
     end
 end
