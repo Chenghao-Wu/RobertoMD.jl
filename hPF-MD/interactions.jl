@@ -117,6 +117,7 @@ struct OriginalhPFInteractions <: NonBondInteraction
     mesh::Mesh
 end
 
+function apply_nonbonds!(args::system,atoms::Vector{atom},forces::Vector{force},energy::Vector{Float64},::NoNonBondInteractions) end
 
 function ParticleFieldInteraction!(atoms::Vector{atom},forces::Vector{force},energy::Vector{Float64},mesh::Mesh,hPF::OriginalhPFInteractions)
     avg_den=length(atoms)/prod(mesh.boxsize)

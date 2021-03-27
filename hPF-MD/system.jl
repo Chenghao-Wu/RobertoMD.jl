@@ -90,7 +90,7 @@ function read_data(filename::AbstractString,format::AbstractString)
     universe=Trajectory(filename,'r',format)
     frame = read(universe)
     pos = positions(frame)
-    center_pos = [minimum(pos[1,:]),minimum(pos[2,:]),minimum(pos[3,:])] ./ 10 # nanometer
+    center_pos = [minimum(pos[1,:]),minimum(pos[2,:]),minimum(pos[3,:])]  # nanometer
     topo = Topology(frame)
     bonds_in=bonds(topo)
     angles_in=angles(topo)
@@ -107,7 +107,7 @@ function read_data(filename::AbstractString,format::AbstractString)
         atomi_=Atom(frame,atomii-1) # question about the atom index?
         massi_=mass(atomi_)
         chargei_=charge(atomi_)
-        current_pos=pos[1:3,atomii]./10 .- center_pos # nanometer
+        current_pos=pos[1:3,atomii] .- center_pos # nanometer
         atomi=atom(type_,massi_,chargei_,current_pos,[0,0,0]) 
         atoms_[atomii]=atomi
     end
