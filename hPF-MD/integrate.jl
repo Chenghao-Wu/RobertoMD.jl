@@ -18,6 +18,14 @@ function calc_inst_temp(atoms::Vector{atom},totalkineticenergy::Float64)
     return T
 end
 
+function calc_totalmomentum(atoms::Vector{atom},velocities::Vector{velocity})
+    P_tot::Float64=0
+    for velocityii=1:length(velocities)
+        P_tot+=sum(velocities[velocityii].velocity .* atoms[velocityii].mass)
+    end
+    return P_tot
+end
+
 function apply_1st_integration!(args::system,atoms::Vector{atom},velocities::Vector{velocity},forces::Vector{force},::NoThermostat) end
 
 function apply_2nd_integration!(args::system,atoms::Vector{atom},velocities::Vector{velocity},forces::Vector{force},::NoThermostat) end

@@ -117,8 +117,8 @@ function DensityatVertex!(mesh::Mesh)
         kcell=pbc_mesh(kcell,mesh.N[3])
 
         icell_plus=pbc_mesh(icell+1,mesh.N[1])
-        jcell_plus=pbc_mesh(jcell+1,mesh.N[1])
-        kcell_plus=pbc_mesh(kcell+1,mesh.N[1])
+        jcell_plus=pbc_mesh(jcell+1,mesh.N[2])
+        kcell_plus=pbc_mesh(kcell+1,mesh.N[3])
 
         mesh.vertexes[getCellIndex(icell,jcell,kcell,mesh.N)]                 +=      mesh.cells[cellii,1]
         mesh.vertexes[getCellIndex(icell_plus,jcell,kcell,mesh.N)]            +=      mesh.cells[cellii,2]

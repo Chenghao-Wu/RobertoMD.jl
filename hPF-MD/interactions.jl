@@ -1,5 +1,5 @@
 
-export TableBondInteractions,OriginalhPFInteractions,FENEBondInteractions
+export TableBondInteractions,OriginalhPFInteractions,FENEBondInteractions,HarmonicBondInteractions
 
 
 function clear_forces!(forces::Vector{force})
@@ -54,6 +54,7 @@ struct HarmonicBondInteractions <: BondInteraction
 end
 
 function apply_bonds!(args::system,atoms::Vector{atom},forces::Vector{force},energy::Vector{Float64},bonds::Vector{bond},harmonicbond::HarmonicBondInteractions) 
+    # 0.5×k×(r-r0)^2
     for bondii=1:length(bonds)
         delta_d = atoms[bonds[bondii].atom_1+1].pos .- atoms[bonds[bondii].atom_2+1].pos
 
@@ -61,10 +62,14 @@ function apply_bonds!(args::system,atoms::Vector{atom},forces::Vector{force},ene
         delta_d .-= args.box .* RInt.( delta_d ./ args.box)
 
         r=norm(delta_d)
-        index_bond=RInt(r/bondtable.δ_d)
-        force_=bondtable.potentials[index_bond,4]
+        
+        force_=harmonicbond.κ*(harmonicbond.r/r-1.0)
         force_divr = force_/r
         
+        # calculate energy
+        energy[bonds[bondii].atom_1+1]+=0.5*0.5*harmonicbond.κ*(r-harmonicbond.r)^2
+        energy[bonds[bondii].atom_2+1]+=0.5*0.5*harmonicbond.κ*(r-harmonicbond.r)^2
+
         # calculate forces
         forces[bonds[bondii].atom_1+1].force .+= delta_d .* force_divr
         forces[bonds[bondii].atom_2+1].force .+= -delta_d .* force_divr
@@ -93,7 +98,6 @@ function apply_bonds!(args::system,atoms::Vector{atom},forces::Vector{force},ene
         rlogarg=1-rsq/r0sq
 
         fbond = -fenebond.K/rlogarg
-
 
         if rsq<fenebond.σ^2
             sr2=fenebond.σ^2/rsq
@@ -132,9 +136,9 @@ function ParticleFieldInteraction!(atoms::Vector{atom},forces::Vector{force},ene
 
         index_cell::Int64=getCellIndex(ix,iy,iz,mesh.N)
 
-        δx=atoms[atomii].pos[1] - floor(atoms[atomii].pos[1] / mesh.edge_size[1]) * mesh.edge_size[1]
-        δy=atoms[atomii].pos[2] - floor(atoms[atomii].pos[2] / mesh.edge_size[2]) * mesh.edge_size[2]
-        δz=atoms[atomii].pos[3] - floor(atoms[atomii].pos[3] / mesh.edge_size[3]) * mesh.edge_size[3]
+        δx=atoms[atomii].pos[1] - ix * mesh.edge_size[1]
+        δy=atoms[atomii].pos[2] - iy * mesh.edge_size[2]
+        δz=atoms[atomii].pos[3] - iz * mesh.edge_size[3]
 
         pic[1]= (mesh.edge_size[1]-δx) * (mesh.edge_size[2]-δy) * (mesh.edge_size[3]-δz) / prod(mesh.edge_size)
         pic[2]= δx                     * (mesh.edge_size[2]-δy) * (mesh.edge_size[3]-δz) / prod(mesh.edge_size)
@@ -181,9 +185,9 @@ function ParticleFieldInteraction!(atoms::Vector{atom},forces::Vector{force},ene
 
         energy[atomii] += 1/hPF.κ*(den_atomii-avg_den)/avg_den
 
-        forces[atomii].force[1] += -1 / hPF.κ *densgrads_atomii[1]/avg_den
-        forces[atomii].force[2] += -1 / hPF.κ *densgrads_atomii[2]/avg_den
-        forces[atomii].force[3] += -1 / hPF.κ *densgrads_atomii[3]/avg_den
+        forces[atomii].force[1] += -1 / hPF.κ * densgrads_atomii[1]/avg_den
+        forces[atomii].force[2] += -1 / hPF.κ * densgrads_atomii[2]/avg_den
+        forces[atomii].force[3] += -1 / hPF.κ * densgrads_atomii[3]/avg_den
     end
    
 end

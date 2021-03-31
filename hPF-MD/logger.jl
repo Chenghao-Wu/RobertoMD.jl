@@ -6,6 +6,7 @@ mutable struct Logger_ <: Logger
     Temp::Bool
     PotentialEnergy::Bool
     KineticEnergy::Bool
+    Momentum::Bool
 end
 
 function logger_init()
@@ -13,7 +14,8 @@ function logger_init()
     Temp=true
     PotentialEnergy=false
     KineticEnergy=false
-    return Logger_(Timestep,Temp,PotentialEnergy,KineticEnergy)
+    Momentum=false
+    return Logger_(Timestep,Temp,PotentialEnergy,KineticEnergy,Momentum)
 end
 
 function apply_logger!(fileO,firststep::Bool,step::Int64,velocities::Vector{velocity},energy::Vector{Float64},atoms::Vector{atom},nl::NoLogger) end
@@ -32,7 +34,10 @@ function apply_logger!(fileO,firststep::Bool,step::Int64,velocities::Vector{velo
             string_out*="PotentialEnergy"*" "
         end
         if log.KineticEnergy==true
-            string_out*="KineticEnergy"
+            string_out*="KineticEnergy"*" "
+        end
+        if log.Momentum==true
+            string_out*="Momentum"
         end
         string_out*="\n"
         write(fileO,string_out)
@@ -53,6 +58,11 @@ function apply_logger!(fileO,firststep::Bool,step::Int64,velocities::Vector{velo
         if log.KineticEnergy==true
             string_out*=format(totalkineticenergy,precision=6)*" "
         end
+        if log.Momentum==true
+            Momentum=calc_totalmomentum(atoms,velocities)
+            string_out*=format(Momentum,precision=6)*" "
+        end
+
         string_out*="\n"
         write(fileO,string_out)
         flush(fileO)
@@ -72,6 +82,10 @@ function apply_logger!(fileO,firststep::Bool,step::Int64,velocities::Vector{velo
         end
         if log.KineticEnergy==true
             string_out*=format(totalkineticenergy,precision=6)*" "
+        end
+        if log.Momentum==true
+            Momentum=calc_totalmomentum(atoms,velocities)
+            string_out*=format(Momentum,precision=6)*" "
         end
         string_out*="\n"
         write(fileO,string_out)
