@@ -54,10 +54,10 @@ end
 
 function pbc_mesh(x_index::Int64,N_mesh::Int64)
     if x_index > N_mesh-1
-        x_index-=N_mesh-1
+        x_index-=N_mesh
     end
     if x_index < 0
-        x_index+=N_mesh-1
+        x_index+=N_mesh
     end
     return x_index
 end
@@ -102,9 +102,76 @@ function cloudincell!(position::Vector{Float64},mesh::Mesh)
     
 end
 
-function move_front(N::Vector{Int64})
-    return 0
+function gaussian_kernel_3d(sigma=1.0)
+    kernel_3D=zeros(3,3,3)
+    center=2
+    for i=1:3
+        for j=1:3
+            for z=1:3
+                kernel_3D[i,j,z]=1 / (sqrt(2 * π) * sigma)^3 * exp(-(((i - center)^2+(j - center)^2+(z - center)^2 )/ sigma^2/2))
+            end
+        end
+    end
+    kernel_3D.*=1/sum(kernel_3D)
+    return kernel_3D
 end
+
+function gaussian_filter(mesh::Mesh,sigma::Float64)
+    gaussian_kernel=gaussian_kernel_3d(sigma)
+    new_densityatvertex=zeros(mesh.N[1]*mesh.N[2]*mesh.N[3]) 
+    for icell=0:mesh.N[1]-1
+        for jcell=0:mesh.N[2]-1
+            for kcell=0:mesh.N[3]-1
+                filter=gaussian_kernel*mesh.vertexes[getCellIndex(icell,jcell,kcell,mesh.N)]  
+
+                icell_plus=pbc_mesh(icell+1,mesh.N[1])
+                jcell_plus=pbc_mesh(jcell+1,mesh.N[2])
+                kcell_plus=pbc_mesh(kcell+1,mesh.N[3])
+
+                icell_minus=pbc_mesh(icell-1,mesh.N[1])
+                jcell_minus=pbc_mesh(jcell-1,mesh.N[2])
+                kcell_minus=pbc_mesh(kcell-1,mesh.N[3])
+
+                new_densityatvertex[getCellIndex(icell_minus,jcell_minus,kcell_minus,mesh.N)]+=filter[1,1,1]
+                new_densityatvertex[getCellIndex(icell_minus,jcell_minus,kcell,mesh.N)]+=filter[1,1,2]
+                new_densityatvertex[getCellIndex(icell_minus,jcell_minus,kcell_plus,mesh.N)]+=filter[1,1,3]
+
+                new_densityatvertex[getCellIndex(icell_minus,jcell,kcell_minus,mesh.N)]+=filter[1,2,1]
+                new_densityatvertex[getCellIndex(icell_minus,jcell,kcell,mesh.N)]+=filter[1,2,2]
+                new_densityatvertex[getCellIndex(icell_minus,jcell,kcell_plus,mesh.N)]+=filter[1,2,3]
+                
+                new_densityatvertex[getCellIndex(icell_minus,jcell_plus,kcell_minus,mesh.N)]+=filter[1,3,1]
+                new_densityatvertex[getCellIndex(icell_minus,jcell_plus,kcell,mesh.N)]+=filter[1,3,2]
+                new_densityatvertex[getCellIndex(icell_minus,jcell_plus,kcell_plus,mesh.N)]+=filter[1,3,3]
+
+                new_densityatvertex[getCellIndex(icell,jcell_minus,kcell_minus,mesh.N)]+=filter[2,1,1]
+                new_densityatvertex[getCellIndex(icell,jcell_minus,kcell,mesh.N)]+=filter[2,1,2]
+                new_densityatvertex[getCellIndex(icell,jcell_minus,kcell_plus,mesh.N)]+=filter[2,1,3]
+
+                new_densityatvertex[getCellIndex(icell,jcell,kcell_minus,mesh.N)]+=filter[2,2,1]
+                new_densityatvertex[getCellIndex(icell,jcell,kcell,mesh.N)]+=filter[2,2,2]
+                new_densityatvertex[getCellIndex(icell,jcell,kcell_plus,mesh.N)]+=filter[2,2,3]
+
+                new_densityatvertex[getCellIndex(icell,jcell_plus,kcell_minus,mesh.N)]+=filter[2,3,1]
+                new_densityatvertex[getCellIndex(icell,jcell_plus,kcell,mesh.N)]+=filter[2,3,2]
+                new_densityatvertex[getCellIndex(icell,jcell_plus,kcell_plus,mesh.N)]+=filter[2,3,3]
+
+                new_densityatvertex[getCellIndex(icell_plus,jcell_minus,kcell_minus,mesh.N)]+=filter[3,1,1]
+                new_densityatvertex[getCellIndex(icell_plus,jcell_minus,kcell,mesh.N)]+=filter[3,1,2]
+                new_densityatvertex[getCellIndex(icell_plus,jcell_minus,kcell_plus,mesh.N)]+=filter[3,1,3]
+
+                new_densityatvertex[getCellIndex(icell_plus,jcell,kcell_minus,mesh.N)]+=filter[3,2,1]
+                new_densityatvertex[getCellIndex(icell_plus,jcell,kcell,mesh.N)]+=filter[3,2,2]
+                new_densityatvertex[getCellIndex(icell_plus,jcell,kcell_plus,mesh.N)]+=filter[3,2,3]
+
+                new_densityatvertex[getCellIndex(icell_plus,jcell_plus,kcell_minus,mesh.N)]+=filter[3,3,1]
+                new_densityatvertex[getCellIndex(icell_plus,jcell_plus,kcell,mesh.N)]+=filter[3,3,2]
+                new_densityatvertex[getCellIndex(icell_plus,jcell_plus,kcell_plus,mesh.N)]+=filter[3,3,3]
+            end
+        end
+    end
+    return new_densityatvertex
+end 
 
 function DensityatVertex!(mesh::Mesh)
     ixyz=zeros(Int64,3)
@@ -129,6 +196,10 @@ function DensityatVertex!(mesh::Mesh)
         mesh.vertexes[getCellIndex(icell,jcell_plus,kcell_plus,mesh.N)]       +=      mesh.cells[cellii,7]
         mesh.vertexes[getCellIndex(icell_plus,jcell_plus,kcell_plus,mesh.N)]  +=      mesh.cells[cellii,8]
     end
+
+    # apply a 3-d gaussian filter
+    #mesh.vertexes=gaussian_filter(mesh,0.5)
+
 end
 
 function Grad_DensVertex!(mesh::Mesh)
@@ -164,8 +235,4 @@ function Grad_DensVertex!(mesh::Mesh)
     
 end
 
-function gaussian_filter(σ::Float64,pos::Vector{Float64},pos2::Float64)
-    Δr ::Vector{Float64} = pos .- pos2
-    gauss::Vector{Float64}=1 ./ (sqrt(2 * π) * σ) .* exp.(-1 .* (Δr ./ 2*σ).^2)
-    return gauss
-end
+

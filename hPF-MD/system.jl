@@ -155,7 +155,7 @@ function run_hPFMD(args::system)
     firststep=args.firststep
 
     # initialize veclocities!
-    velociy_init=true
+    velociy_init=false
     if velociy_init==false
         velocities_=velocities_
     else
