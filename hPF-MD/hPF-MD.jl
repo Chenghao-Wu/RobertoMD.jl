@@ -10,6 +10,7 @@ using ProgressMeter
 using LinearAlgebra
 using DelimitedFiles
 using Base.Threads
+using FFTW
 
 include("system.jl")
 include("integrate.jl")

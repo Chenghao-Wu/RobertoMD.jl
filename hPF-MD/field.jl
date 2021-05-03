@@ -1,13 +1,28 @@
 
-export Mesh,clear_mesh!,init_mesh
+export Mesh,clear_mesh!,init_mesh, meshgrid
 
 struct Mesh
     edge_size::Array{Float64,1}
     N::Array{Int64,1}
-    cells::Array{Float64,2}
-    vertexes::Array{Float64,1}
-    densgrads::Array{Float64,2}
+    grids::Array{Float64,3}
     boxsize::Array{Float64,1}
+    boxmatrix::Array{Float64,2}
+    Kmag::Array{Float64,3}
+    Ks::Array{Float64,3}
+    Ls::Array{Float64,3}
+    Zs::Array{Float64,3}
+end
+
+function meshgrid(vx::AbstractVector{T}, vy::AbstractVector{T},
+    vz::AbstractVector{T}) where T
+    m, n, o = length(vy), length(vx), length(vz)
+    vx = reshape(vx, 1, n, 1)
+    vy = reshape(vy, m, 1, 1)
+    vz = reshape(vz, 1, 1, o)
+    om = ones(Int, m)
+    on = ones(Int, n)
+    oo = ones(Int, o)
+    (vx[om, :, oo], vy[:, on, oo], vz[om, on, :])
 end
 
 function init_mesh(boxsize::Vector{Float64},Nx::Int64,Ny::Int64,Nz::Int64)
@@ -17,26 +32,35 @@ function init_mesh(boxsize::Vector{Float64},Nx::Int64,Ny::Int64,Nz::Int64)
     edge_size=[egde_x,egde_y,egde_z]
     N=[Nx,Ny,Nz]
     N_total::Int64=Nx*Ny*Nz
-    cells=zeros(N_total,8)
-    vertexes=zeros(N_total) 
-    densgrads=zeros(N_total,3) 
-    return Mesh(edge_size,N,cells,vertexes,densgrads,boxsize)
+    grids=zeros(Nx,Ny,Nz)
+    boxmatrix=[boxsize[1] 0 0;0 boxsize[2] 0;0 0 boxsize[3]]
+
+    ks=FFTW.fftfreq(N[1], 2π/(boxsize[1]/N[1]))
+    ls=FFTW.fftfreq(N[2], 2π/(boxsize[2]/N[1]))
+    zs=FFTW.fftfreq(N[3], 2π/(boxsize[3]/N[1]))
+
+    Ks,Ls,Zs=meshgrid(ks,ls,zs)
+    #print(Ks)
+    
+    Kmag=(Ks.^2 .+Ls.^2 .+ Zs.^2)
+
+    return Mesh(edge_size,N,grids,boxsize,boxmatrix,Kmag,Ks,Ls,Zs)
 end
 
 function clear_mesh!(mesh::Mesh)
-    for i=1:prod(mesh.N)
-        mesh.cells[i,1]=0.0
-        mesh.cells[i,2]=0.0
-        mesh.cells[i,3]=0.0
-        mesh.cells[i,4]=0.0
-        mesh.cells[i,5]=0.0
-        mesh.cells[i,6]=0.0
-        mesh.cells[i,7]=0.0
-        mesh.cells[i,8]=0.0
-        mesh.vertexes[i]=0.0
-        mesh.densgrads[i,1]=0.0
-        mesh.densgrads[i,2]=0.0
-        mesh.densgrads[i,3]=0.0
+    for i=1:mesh.N[1]
+        for j=1:mesh.N[2]
+            for k=1:mesh.N[3]
+                mesh.grids[i,j,k]=0.0
+                mesh.grids[i,j,k]=0.0
+                mesh.grids[i,j,k]=0.0
+                mesh.grids[i,j,k]=0.0
+                mesh.grids[i,j,k]=0.0
+                mesh.grids[i,j,k]=0.0
+                mesh.grids[i,j,k]=0.0
+                mesh.grids[i,j,k]=0.0
+            end
+        end
     end
 end
 
@@ -55,6 +79,9 @@ end
 function pbc_mesh(x_index::Int64,N_mesh::Int64)
     if x_index > N_mesh-1
         x_index-=N_mesh
+        if x_index>N_mesh-1
+            x_index-=N_mesh
+        end
     end
     if x_index < 0
         x_index+=N_mesh
@@ -65,6 +92,23 @@ end
 function pbc_particle(position::Vector{Float64},mesh::Mesh)
     position .-= mesh.boxsize .* floor.( position ./ mesh.boxsize)
     return position
+end
+
+function pbc_particle(position::Float64,boxsize::Float64)
+    position -= boxsize * floor( position / boxsize)
+    return position
+end
+
+function cloudincell(wrapped_pos::Array{Float64,1},gridedge::Array{Float64,1},meshnumber::Array{Int64,1})
+    
+    δx_lower=wrapped_pos[1] - floor(wrapped_pos[1] / edge_size[1]) * edge_size[1]
+    δy_lower=wrapped_pos[2] - floor(wrapped_pos[2] / edge_size[2]) * edge_size[2]
+    δz_lower=wrapped_pos[3] - floor(wrapped_pos[3] / edge_size[3]) * edge_size[3]
+
+    δx_upper=edge_size[1]-δx_lower
+    δy_upper=edge_size[1]-δy_lower
+    δz_upper=edge_size[1]-δz_lower
+
 end
 
 function cloudincell!(position::Vector{Float64},mesh::Mesh)
@@ -79,160 +123,71 @@ function cloudincell!(position::Vector{Float64},mesh::Mesh)
     # -------------
     # 1           2 
     
-    position=pbc_particle(position,mesh)
+    position_x=pbc_particle(position[1],mesh.boxsize[1])
+    position_y=pbc_particle(position[2],mesh.boxsize[2])
+    position_z=pbc_particle(position[3],mesh.boxsize[3])
 
-    ix=floor(Int64, position[1] / mesh.edge_size[1])
-    iy=floor(Int64, position[2] / mesh.edge_size[2])
-    iz=floor(Int64, position[3] / mesh.edge_size[3])
-
-    index_cell::Int64=getCellIndex(ix,iy,iz,mesh.N)
-    
     δx=position[1] - floor(position[1] / mesh.edge_size[1]) * mesh.edge_size[1]
     δy=position[2] - floor(position[2] / mesh.edge_size[2]) * mesh.edge_size[2]
     δz=position[3] - floor(position[3] / mesh.edge_size[3]) * mesh.edge_size[3]
 
-    mesh.cells[index_cell,1] += (mesh.edge_size[1]-δx) * (mesh.edge_size[2]-δy) * (mesh.edge_size[3]-δz) / prod(mesh.edge_size)
-    mesh.cells[index_cell,2] += δx                     * (mesh.edge_size[2]-δy) * (mesh.edge_size[3]-δz) / prod(mesh.edge_size)
-    mesh.cells[index_cell,3] += (mesh.edge_size[1]-δx) * δy                     * (mesh.edge_size[3]-δz) / prod(mesh.edge_size)
-    mesh.cells[index_cell,4] += δx                     * δy                     * (mesh.edge_size[3]-δz) / prod(mesh.edge_size)
-    mesh.cells[index_cell,5] += (mesh.edge_size[1]-δx) * (mesh.edge_size[2]-δy) *                     δz / prod(mesh.edge_size)
-    mesh.cells[index_cell,6] += δx                     * (mesh.edge_size[2]-δy) *                     δz / prod(mesh.edge_size)
-    mesh.cells[index_cell,7] += (mesh.edge_size[1]-δx) * δy                     *                     δz / prod(mesh.edge_size)
-    mesh.cells[index_cell,8] += δx                     * δy                     *                     δz / prod(mesh.edge_size)
+    cell_index_x=floor(Int64, position_x / mesh.edge_size[1])
+    cell_index_y=floor(Int64, position_y / mesh.edge_size[2])
+    cell_index_z=floor(Int64, position_z / mesh.edge_size[3])
+
+    cell_index_x_plus=pbc_mesh(cell_index_x+1,mesh.N[1])
+    cell_index_y_plus=pbc_mesh(cell_index_y+1,mesh.N[2])
+    cell_index_z_plus=pbc_mesh(cell_index_z+1,mesh.N[3])
+
+    cell_index_x=cell_index_x+1
+    cell_index_y=cell_index_y+1
+    cell_index_z=cell_index_z+1
+
+    cell_index_x_plus=cell_index_x_plus+1
+    cell_index_y_plus=cell_index_y_plus+1
+    cell_index_z_plus=cell_index_z_plus+1
+
+    mesh.grids[cell_index_x,cell_index_y,cell_index_z]                += (mesh.edge_size[1]-δx) * (mesh.edge_size[2]-δy) * (mesh.edge_size[3]-δz) / prod(mesh.edge_size)
+    mesh.grids[cell_index_x,cell_index_y_plus,cell_index_z]           += (mesh.edge_size[1]-δx) * (δy) * (mesh.edge_size[3]-δz) / prod(mesh.edge_size)                 
+    mesh.grids[cell_index_x,cell_index_y_plus,cell_index_z_plus]      += (mesh.edge_size[1]-δx) * (δy) * (δz) / prod(mesh.edge_size)                                   
+    mesh.grids[cell_index_x,cell_index_y,cell_index_z_plus]           += (mesh.edge_size[1]-δx) * (mesh.edge_size[2]-δy) * (δz) / prod(mesh.edge_size)                 
+    mesh.grids[cell_index_x_plus,cell_index_y,cell_index_z]           += (δx) * (mesh.edge_size[2]-δy) * (mesh.edge_size[3]-δz) / prod(mesh.edge_size)                  
+    mesh.grids[cell_index_x_plus,cell_index_y,cell_index_z_plus]      += (δx) * (mesh.edge_size[2]-δy) * (δz) / prod(mesh.edge_size)                                   
+    mesh.grids[cell_index_x_plus,cell_index_y_plus,cell_index_z]      += (δx) * (δy) * (mesh.edge_size[3]-δz) / prod(mesh.edge_size)                                   
+    mesh.grids[cell_index_x_plus,cell_index_y_plus,cell_index_z_plus] += (δx) * (δy) * (δz) / prod(mesh.edge_size)                                                      
     
 end
 
-function gaussian_kernel_3d(sigma=1.0)
-    kernel_3D=zeros(3,3,3)
-    center=2
-    for i=1:3
-        for j=1:3
-            for z=1:3
-                kernel_3D[i,j,z]=1 / (sqrt(2 * π) * sigma)^3 * exp(-(((i - center)^2+(j - center)^2+(z - center)^2 )/ sigma^2/2))
-            end
-        end
-    end
-    kernel_3D.*=1/sum(kernel_3D)
-    return kernel_3D
-end
+function Grad_DensVertex(mesh::Mesh)
+    grid_grad_x=zeros(mesh.N[1],mesh.N[2],mesh.N[3])
+    grid_grad_y=zeros(mesh.N[1],mesh.N[2],mesh.N[3])
+    grid_grad_z=zeros(mesh.N[1],mesh.N[2],mesh.N[3])
 
-function gaussian_filter(mesh::Mesh,sigma::Float64)
-    gaussian_kernel=gaussian_kernel_3d(sigma)
-    new_densityatvertex=zeros(mesh.N[1]*mesh.N[2]*mesh.N[3]) 
     for icell=0:mesh.N[1]-1
         for jcell=0:mesh.N[2]-1
             for kcell=0:mesh.N[3]-1
-                filter=gaussian_kernel*mesh.vertexes[getCellIndex(icell,jcell,kcell,mesh.N)]  
 
-                icell_plus=pbc_mesh(icell+1,mesh.N[1])
-                jcell_plus=pbc_mesh(jcell+1,mesh.N[2])
-                kcell_plus=pbc_mesh(kcell+1,mesh.N[3])
 
-                icell_minus=pbc_mesh(icell-1,mesh.N[1])
-                jcell_minus=pbc_mesh(jcell-1,mesh.N[2])
-                kcell_minus=pbc_mesh(kcell-1,mesh.N[3])
+                icell_plus=pbc_mesh(icell+1,mesh.N[1])+1
+                jcell_plus=pbc_mesh(jcell+1,mesh.N[2])+1
+                kcell_plus=pbc_mesh(kcell+1,mesh.N[3])+1
 
-                new_densityatvertex[getCellIndex(icell_minus,jcell_minus,kcell_minus,mesh.N)]+=filter[1,1,1]
-                new_densityatvertex[getCellIndex(icell_minus,jcell_minus,kcell,mesh.N)]+=filter[1,1,2]
-                new_densityatvertex[getCellIndex(icell_minus,jcell_minus,kcell_plus,mesh.N)]+=filter[1,1,3]
+                icell_minus=pbc_mesh(icell-1,mesh.N[1])+1
+                jcell_minus=pbc_mesh(jcell-1,mesh.N[2])+1
+                kcell_minus=pbc_mesh(kcell-1,mesh.N[3])+1
 
-                new_densityatvertex[getCellIndex(icell_minus,jcell,kcell_minus,mesh.N)]+=filter[1,2,1]
-                new_densityatvertex[getCellIndex(icell_minus,jcell,kcell,mesh.N)]+=filter[1,2,2]
-                new_densityatvertex[getCellIndex(icell_minus,jcell,kcell_plus,mesh.N)]+=filter[1,2,3]
+                icell_=icell+1
+                jcell_=jcell+1
+                kcell_=kcell+1
                 
-                new_densityatvertex[getCellIndex(icell_minus,jcell_plus,kcell_minus,mesh.N)]+=filter[1,3,1]
-                new_densityatvertex[getCellIndex(icell_minus,jcell_plus,kcell,mesh.N)]+=filter[1,3,2]
-                new_densityatvertex[getCellIndex(icell_minus,jcell_plus,kcell_plus,mesh.N)]+=filter[1,3,3]
-
-                new_densityatvertex[getCellIndex(icell,jcell_minus,kcell_minus,mesh.N)]+=filter[2,1,1]
-                new_densityatvertex[getCellIndex(icell,jcell_minus,kcell,mesh.N)]+=filter[2,1,2]
-                new_densityatvertex[getCellIndex(icell,jcell_minus,kcell_plus,mesh.N)]+=filter[2,1,3]
-
-                new_densityatvertex[getCellIndex(icell,jcell,kcell_minus,mesh.N)]+=filter[2,2,1]
-                new_densityatvertex[getCellIndex(icell,jcell,kcell,mesh.N)]+=filter[2,2,2]
-                new_densityatvertex[getCellIndex(icell,jcell,kcell_plus,mesh.N)]+=filter[2,2,3]
-
-                new_densityatvertex[getCellIndex(icell,jcell_plus,kcell_minus,mesh.N)]+=filter[2,3,1]
-                new_densityatvertex[getCellIndex(icell,jcell_plus,kcell,mesh.N)]+=filter[2,3,2]
-                new_densityatvertex[getCellIndex(icell,jcell_plus,kcell_plus,mesh.N)]+=filter[2,3,3]
-
-                new_densityatvertex[getCellIndex(icell_plus,jcell_minus,kcell_minus,mesh.N)]+=filter[3,1,1]
-                new_densityatvertex[getCellIndex(icell_plus,jcell_minus,kcell,mesh.N)]+=filter[3,1,2]
-                new_densityatvertex[getCellIndex(icell_plus,jcell_minus,kcell_plus,mesh.N)]+=filter[3,1,3]
-
-                new_densityatvertex[getCellIndex(icell_plus,jcell,kcell_minus,mesh.N)]+=filter[3,2,1]
-                new_densityatvertex[getCellIndex(icell_plus,jcell,kcell,mesh.N)]+=filter[3,2,2]
-                new_densityatvertex[getCellIndex(icell_plus,jcell,kcell_plus,mesh.N)]+=filter[3,2,3]
-
-                new_densityatvertex[getCellIndex(icell_plus,jcell_plus,kcell_minus,mesh.N)]+=filter[3,3,1]
-                new_densityatvertex[getCellIndex(icell_plus,jcell_plus,kcell,mesh.N)]+=filter[3,3,2]
-                new_densityatvertex[getCellIndex(icell_plus,jcell_plus,kcell_plus,mesh.N)]+=filter[3,3,3]
+                grad_x=0.5*(mesh.grids[icell_plus,jcell_,kcell_]-mesh.grids[icell_minus,jcell_,kcell_])
+                grad_y=0.5*(mesh.grids[icell_,jcell_plus,kcell_]-mesh.grids[icell_,jcell_minus,kcell_])
+                grad_z=0.5*(mesh.grids[icell_,jcell_,kcell_plus]-mesh.grids[icell_,jcell_,kcell_minus])
+                grid_grad_x[icell_,jcell_,kcell_] += grad_x
+                grid_grad_y[icell_,jcell_,kcell_] += grad_y
+                grid_grad_z[icell_,jcell_,kcell_] += grad_z
             end
         end
     end
-    return new_densityatvertex
-end 
-
-function DensityatVertex!(mesh::Mesh)
-    ixyz=zeros(Int64,3)
-    for cellii=1:prod(mesh.N)
-
-        icell,jcell,kcell=getiXYZfromCellIndex(ixyz,cellii,mesh.N)
-
-        icell=pbc_mesh(icell,mesh.N[1])
-        jcell=pbc_mesh(jcell,mesh.N[2])
-        kcell=pbc_mesh(kcell,mesh.N[3])
-
-        icell_plus=pbc_mesh(icell+1,mesh.N[1])
-        jcell_plus=pbc_mesh(jcell+1,mesh.N[2])
-        kcell_plus=pbc_mesh(kcell+1,mesh.N[3])
-
-        mesh.vertexes[getCellIndex(icell,jcell,kcell,mesh.N)]                 +=      mesh.cells[cellii,1]
-        mesh.vertexes[getCellIndex(icell_plus,jcell,kcell,mesh.N)]            +=      mesh.cells[cellii,2]
-        mesh.vertexes[getCellIndex(icell,jcell_plus,kcell,mesh.N)]            +=      mesh.cells[cellii,3]
-        mesh.vertexes[getCellIndex(icell_plus,jcell_plus,kcell,mesh.N)]       +=      mesh.cells[cellii,4]
-        mesh.vertexes[getCellIndex(icell,jcell,kcell_plus,mesh.N)]            +=      mesh.cells[cellii,5]
-        mesh.vertexes[getCellIndex(icell_plus,jcell,kcell_plus,mesh.N)]       +=      mesh.cells[cellii,6]
-        mesh.vertexes[getCellIndex(icell,jcell_plus,kcell_plus,mesh.N)]       +=      mesh.cells[cellii,7]
-        mesh.vertexes[getCellIndex(icell_plus,jcell_plus,kcell_plus,mesh.N)]  +=      mesh.cells[cellii,8]
-    end
-
-    # apply a 3-d gaussian filter
-    #mesh.vertexes=gaussian_filter(mesh,0.5)
-
+    return grid_grad_x,grid_grad_y,grid_grad_z
 end
-
-function Grad_DensVertex!(mesh::Mesh)
-    ixyz=zeros(Int64,3)
-    for cellii=1:prod(mesh.N)
-
-        icell,jcell,kcell=getiXYZfromCellIndex(ixyz,cellii,mesh.N)
-
-        icell_plus=pbc_mesh(icell+1,mesh.N[1])
-        jcell_plus=pbc_mesh(jcell+1,mesh.N[2])
-        kcell_plus=pbc_mesh(kcell+1,mesh.N[3])
-
-        icell_minus=pbc_mesh(icell-1,mesh.N[1])
-        jcell_minus=pbc_mesh(jcell-1,mesh.N[2])
-        kcell_minus=pbc_mesh(kcell-1,mesh.N[3])
-
-        dens_ii         = getCellIndex(icell,jcell,kcell,mesh.N)
-        dens_ii_right   = getCellIndex(icell_plus,jcell,kcell,mesh.N)
-        dens_ii_left    = getCellIndex(icell_minus,jcell,kcell,mesh.N)
-        dens_ii_front   = getCellIndex(icell,jcell_plus,kcell,mesh.N)
-        dens_ii_back    = getCellIndex(icell,jcell_minus,kcell,mesh.N)
-        dens_ii_up      = getCellIndex(icell,jcell,kcell_plus,mesh.N)
-        dens_ii_down    = getCellIndex(icell,jcell,kcell_minus,mesh.N)
-
-        
-        grad_x=0.5*(mesh.vertexes[dens_ii_right]-mesh.vertexes[dens_ii_left])
-        grad_y=0.5*(mesh.vertexes[dens_ii_front]-mesh.vertexes[dens_ii_back])
-        grad_z=0.5*(mesh.vertexes[dens_ii_up]-mesh.vertexes[dens_ii_down])
-        mesh.densgrads[dens_ii,1] += grad_x
-        mesh.densgrads[dens_ii,2] += grad_y
-        mesh.densgrads[dens_ii,3] += grad_z
-    end
-    
-end
-
-

@@ -1,5 +1,5 @@
 
-export TableBondInteractions,OriginalhPFInteractions,FENEBondInteractions,HarmonicBondInteractions
+export TableBondInteractions,FENEBondInteractions,HarmonicBondInteractions,spectralhPFInteractions,originalhPFInteractions
 
 
 function clear_forces!(forces::Vector{force})
@@ -116,89 +116,211 @@ function apply_bonds!(args::system,atoms::Vector{atom},forces::Vector{force},ene
     end
 end
 
-struct OriginalhPFInteractions <: NonBondInteraction 
-    κ::Float64
+struct spectralhPFInteractions <: NonBondInteraction 
     mesh::Mesh
+    κ::Float64
+    σ::Float64
+end
+
+struct originalhPFInteractions <: NonBondInteraction 
+    mesh::Mesh
+    κ::Float64
 end
 
 function apply_nonbonds!(args::system,atoms::Vector{atom},forces::Vector{force},energy::Vector{Float64},::NoNonBondInteractions) end
 
-function ParticleFieldInteraction!(atoms::Vector{atom},forces::Vector{force},energy::Vector{Float64},mesh::Mesh,hPF::OriginalhPFInteractions)
+function ParticleFieldInteraction!(atoms::Vector{atom},forces::Vector{force},energy::Vector{Float64},mesh::Mesh,hPF::originalhPFInteractions)
     avg_den=length(atoms)/prod(mesh.boxsize)
     pic=zeros(8)
-    vertex_=zeros(Int64,8)
-    densgrads_atomii=zeros(3)
+    
+    # force on the grids: -1 * derivative of the potential on grids
+    grid_grad_x,grid_grad_y,grid_grad_z=Grad_DensVertex(mesh)
+
     for atomii =1:length(atoms)
 
         ix::Int64=floor(atoms[atomii].pos[1] / mesh.edge_size[1])
         iy::Int64=floor(atoms[atomii].pos[2] / mesh.edge_size[2])
         iz::Int64=floor(atoms[atomii].pos[3] / mesh.edge_size[3])
 
-        index_cell::Int64=getCellIndex(ix,iy,iz,mesh.N)
+        δx=atoms[atomii].pos[1] - ix * mesh.edge_size[1]
+        δy=atoms[atomii].pos[2] - iy * mesh.edge_size[2]
+        δz=atoms[atomii].pos[3] - iz * mesh.edge_size[3]
+
+        pic[1]= (mesh.edge_size[1]-δx) * (mesh.edge_size[2]-δy) * (mesh.edge_size[3]-δz) / prod(mesh.edge_size)
+        pic[2]= (mesh.edge_size[1]-δx) * (δy) * (mesh.edge_size[3]-δz) / prod(mesh.edge_size)                 
+        pic[3]= (mesh.edge_size[1]-δx) * (δy) * (δz) / prod(mesh.edge_size)                                   
+        pic[4]= (mesh.edge_size[1]-δx) * (mesh.edge_size[2]-δy) * (δz) / prod(mesh.edge_size)                 
+        pic[5]= (δx) * (mesh.edge_size[2]-δy) * (mesh.edge_size[3]-δz) / prod(mesh.edge_size)                  
+        pic[6]= (δx) * (mesh.edge_size[2]-δy) * (δz) / prod(mesh.edge_size)                                   
+        pic[7]= (δx) * (δy) * (mesh.edge_size[3]-δz) / prod(mesh.edge_size)                                   
+        pic[8]= (δx) * (δy) * (δz) / prod(mesh.edge_size)                                                      
+
+        icell=ix
+        jcell=iy
+        kcell=iz
+
+        cell_index_x=pbc_mesh(icell,mesh.N[1])
+        cell_index_y=pbc_mesh(jcell,mesh.N[2])
+        cell_index_z=pbc_mesh(kcell,mesh.N[3])
+
+        cell_index_x_plus=pbc_mesh(cell_index_x+1,mesh.N[1])
+        cell_index_y_plus=pbc_mesh(cell_index_y+1,mesh.N[2])
+        cell_index_z_plus=pbc_mesh(cell_index_z+1,mesh.N[3])
+
+        cell_index_x=cell_index_x+1
+        cell_index_y=cell_index_y+1
+        cell_index_z=cell_index_z+1
+
+        cell_index_x_plus=cell_index_x_plus+1
+        cell_index_y_plus=cell_index_y_plus+1
+        cell_index_z_plus=cell_index_z_plus+1
+
+        energy[atomii]+=mesh.grids[cell_index_x,cell_index_y,cell_index_z]                *pic[1]*1/(avg_den*hPF.κ)
+        energy[atomii]+=mesh.grids[cell_index_x,cell_index_y_plus,cell_index_z]           *pic[2]*1/(avg_den*hPF.κ)
+        energy[atomii]+=mesh.grids[cell_index_x,cell_index_y_plus,cell_index_z_plus]      *pic[3]*1/(avg_den*hPF.κ)
+        energy[atomii]+=mesh.grids[cell_index_x,cell_index_y,cell_index_z_plus]           *pic[4]*1/(avg_den*hPF.κ)
+        energy[atomii]+=mesh.grids[cell_index_x_plus,cell_index_y,cell_index_z]           *pic[5]*1/(avg_den*hPF.κ)
+        energy[atomii]+=mesh.grids[cell_index_x_plus,cell_index_y,cell_index_z_plus]      *pic[6]*1/(avg_den*hPF.κ)
+        energy[atomii]+=mesh.grids[cell_index_x_plus,cell_index_y_plus,cell_index_z]      *pic[7]*1/(avg_den*hPF.κ)
+        energy[atomii]+=mesh.grids[cell_index_x_plus,cell_index_y_plus,cell_index_z_plus] *pic[8]*1/(avg_den*hPF.κ)
+
+        energy[atomii]-=1/hPF.κ
+
+        forces[atomii].force[1]+=  grid_grad_x[cell_index_x,cell_index_y,cell_index_z]                *pic[1] * -1 / hPF.κ/avg_den
+        forces[atomii].force[1]+=  grid_grad_x[cell_index_x,cell_index_y_plus,cell_index_z]           *pic[2] * -1 / hPF.κ/avg_den
+        forces[atomii].force[1]+=  grid_grad_x[cell_index_x,cell_index_y_plus,cell_index_z_plus]      *pic[3] * -1 / hPF.κ/avg_den
+        forces[atomii].force[1]+=  grid_grad_x[cell_index_x,cell_index_y,cell_index_z_plus]           *pic[4] * -1 / hPF.κ/avg_den
+        forces[atomii].force[1]+=  grid_grad_x[cell_index_x_plus,cell_index_y,cell_index_z]           *pic[5] * -1 / hPF.κ/avg_den
+        forces[atomii].force[1]+=  grid_grad_x[cell_index_x_plus,cell_index_y,cell_index_z_plus]      *pic[6] * -1 / hPF.κ/avg_den
+        forces[atomii].force[1]+=  grid_grad_x[cell_index_x_plus,cell_index_y_plus,cell_index_z]      *pic[7] * -1 / hPF.κ/avg_den
+        forces[atomii].force[1]+=  grid_grad_x[cell_index_x_plus,cell_index_y_plus,cell_index_z_plus] *pic[8] * -1 / hPF.κ/avg_den
+
+        forces[atomii].force[2]+=  grid_grad_y[cell_index_x,cell_index_y,cell_index_z]                *pic[1] * -1 / hPF.κ/avg_den
+        forces[atomii].force[2]+=  grid_grad_y[cell_index_x,cell_index_y_plus,cell_index_z]           *pic[2] * -1 / hPF.κ/avg_den
+        forces[atomii].force[2]+=  grid_grad_y[cell_index_x,cell_index_y_plus,cell_index_z_plus]      *pic[3] * -1 / hPF.κ/avg_den
+        forces[atomii].force[2]+=  grid_grad_y[cell_index_x,cell_index_y,cell_index_z_plus]           *pic[4] * -1 / hPF.κ/avg_den
+        forces[atomii].force[2]+=  grid_grad_y[cell_index_x_plus,cell_index_y,cell_index_z]           *pic[5] * -1 / hPF.κ/avg_den
+        forces[atomii].force[2]+=  grid_grad_y[cell_index_x_plus,cell_index_y,cell_index_z_plus]      *pic[6] * -1 / hPF.κ/avg_den
+        forces[atomii].force[2]+=  grid_grad_y[cell_index_x_plus,cell_index_y_plus,cell_index_z]      *pic[7] * -1 / hPF.κ/avg_den
+        forces[atomii].force[2]+=  grid_grad_y[cell_index_x_plus,cell_index_y_plus,cell_index_z_plus] *pic[8] * -1 / hPF.κ/avg_den
+
+        forces[atomii].force[3]+=  grid_grad_z[cell_index_x,cell_index_y,cell_index_z]                *pic[1] * -1 / hPF.κ/avg_den 
+        forces[atomii].force[3]+=  grid_grad_z[cell_index_x,cell_index_y_plus,cell_index_z]           *pic[2] * -1 / hPF.κ/avg_den
+        forces[atomii].force[3]+=  grid_grad_z[cell_index_x,cell_index_y_plus,cell_index_z_plus]      *pic[3] * -1 / hPF.κ/avg_den
+        forces[atomii].force[3]+=  grid_grad_z[cell_index_x,cell_index_y,cell_index_z_plus]           *pic[4] * -1 / hPF.κ/avg_den
+        forces[atomii].force[3]+=  grid_grad_z[cell_index_x_plus,cell_index_y,cell_index_z]           *pic[5] * -1 / hPF.κ/avg_den
+        forces[atomii].force[3]+=  grid_grad_z[cell_index_x_plus,cell_index_y,cell_index_z_plus]      *pic[6] * -1 / hPF.κ/avg_den
+        forces[atomii].force[3]+=  grid_grad_z[cell_index_x_plus,cell_index_y_plus,cell_index_z]      *pic[7] * -1 / hPF.κ/avg_den
+        forces[atomii].force[3]+=  grid_grad_z[cell_index_x_plus,cell_index_y_plus,cell_index_z_plus] *pic[8] * -1 / hPF.κ/avg_den
+
+    end
+   
+end
+
+function ParticleFieldInteraction!(atoms::Vector{atom},forces::Vector{force},energy::Vector{Float64},mesh::Mesh,hPF::spectralhPFInteractions)
+    avg_den=length(atoms)/prod(mesh.boxsize)
+    pic=zeros(8)
+
+    # apply gaussian filter
+
+    # forward transform
+    complex_field=fft(mesh.grids) 
+    #convolution with gaussian
+    conv_filed=complex_field .* exp.(-0.5 .* hPF.σ^2 .* mesh.Kmag)
+    # backward transform
+    grids=real(ifft(conv_filed)) 
+    
+    # force on the grids: -1 * derivative of the potential on grids
+    grid_grad_x=real(ifft( conv_filed .* 1/(avg_den*hPF.κ) .* -1 .* mesh.Ls .* 1im)) 
+    grid_grad_y=real(ifft( conv_filed .* 1/(avg_den*hPF.κ) .* -1 .* mesh.Ks .* 1im)) 
+    grid_grad_z=real(ifft( conv_filed .* 1/(avg_den*hPF.κ) .* -1 .* mesh.Zs .* 1im)) 
+
+    for atomii =1:length(atoms)
+
+        ix::Int64=floor(atoms[atomii].pos[1] / mesh.edge_size[1])
+        iy::Int64=floor(atoms[atomii].pos[2] / mesh.edge_size[2])
+        iz::Int64=floor(atoms[atomii].pos[3] / mesh.edge_size[3])
 
         δx=atoms[atomii].pos[1] - ix * mesh.edge_size[1]
         δy=atoms[atomii].pos[2] - iy * mesh.edge_size[2]
         δz=atoms[atomii].pos[3] - iz * mesh.edge_size[3]
 
         pic[1]= (mesh.edge_size[1]-δx) * (mesh.edge_size[2]-δy) * (mesh.edge_size[3]-δz) / prod(mesh.edge_size)
-        pic[2]= δx                     * (mesh.edge_size[2]-δy) * (mesh.edge_size[3]-δz) / prod(mesh.edge_size)
-        pic[3]= (mesh.edge_size[1]-δx) * δy                     * (mesh.edge_size[3]-δz) / prod(mesh.edge_size)
-        pic[4]= δx                     * δy                     * (mesh.edge_size[3]-δz) / prod(mesh.edge_size)
-        pic[5]= (mesh.edge_size[1]-δx) * (mesh.edge_size[2]-δy) *                     δz / prod(mesh.edge_size)
-        pic[6]= δx                     * (mesh.edge_size[2]-δy) *                     δz / prod(mesh.edge_size)
-        pic[7]= (mesh.edge_size[1]-δx) * δy                     *                     δz / prod(mesh.edge_size)
-        pic[8]= δx                     * δy                     *                     δz / prod(mesh.edge_size)
+        pic[2]= (mesh.edge_size[1]-δx) * (δy) * (mesh.edge_size[3]-δz) / prod(mesh.edge_size)                 
+        pic[3]= (mesh.edge_size[1]-δx) * (δy) * (δz) / prod(mesh.edge_size)                                   
+        pic[4]= (mesh.edge_size[1]-δx) * (mesh.edge_size[2]-δy) * (δz) / prod(mesh.edge_size)                 
+        pic[5]= (δx) * (mesh.edge_size[2]-δy) * (mesh.edge_size[3]-δz) / prod(mesh.edge_size)                  
+        pic[6]= (δx) * (mesh.edge_size[2]-δy) * (δz) / prod(mesh.edge_size)                                   
+        pic[7]= (δx) * (δy) * (mesh.edge_size[3]-δz) / prod(mesh.edge_size)                                   
+        pic[8]= (δx) * (δy) * (δz) / prod(mesh.edge_size)                                                      
 
         icell=ix
         jcell=iy
         kcell=iz
 
-        icell=pbc_mesh(icell,mesh.N[1])
-        jcell=pbc_mesh(jcell,mesh.N[2])
-        kcell=pbc_mesh(kcell,mesh.N[3])
+        cell_index_x=pbc_mesh(icell,mesh.N[1])
+        cell_index_y=pbc_mesh(jcell,mesh.N[2])
+        cell_index_z=pbc_mesh(kcell,mesh.N[3])
 
-        icell_plus=pbc_mesh(icell+1,mesh.N[1])
-        jcell_plus=pbc_mesh(jcell+1,mesh.N[1])
-        kcell_plus=pbc_mesh(kcell+1,mesh.N[1])
+        cell_index_x_plus=pbc_mesh(cell_index_x+1,mesh.N[1])
+        cell_index_y_plus=pbc_mesh(cell_index_y+1,mesh.N[2])
+        cell_index_z_plus=pbc_mesh(cell_index_z+1,mesh.N[3])
 
-        vertex_[1]=getCellIndex(icell,jcell,kcell,mesh.N)                 
-        vertex_[2]=getCellIndex(icell_plus,jcell,kcell,mesh.N)            
-        vertex_[3]=getCellIndex(icell,jcell_plus,kcell,mesh.N)            
-        vertex_[4]=getCellIndex(icell_plus,jcell_plus,kcell,mesh.N)       
-        vertex_[5]=getCellIndex(icell,jcell,kcell_plus,mesh.N)            
-        vertex_[6]=getCellIndex(icell_plus,jcell,kcell_plus,mesh.N)       
-        vertex_[7]=getCellIndex(icell,jcell_plus,kcell_plus,mesh.N)       
-        vertex_[8]=getCellIndex(icell_plus,jcell_plus,kcell_plus,mesh.N)  
+        cell_index_x=cell_index_x+1
+        cell_index_y=cell_index_y+1
+        cell_index_z=cell_index_z+1
 
-        den_atomii=0
-        
-        densgrads_atomii[1]=0.0
-        densgrads_atomii[2]=0.0
-        densgrads_atomii[3]=0.0
+        cell_index_x_plus=cell_index_x_plus+1
+        cell_index_y_plus=cell_index_y_plus+1
+        cell_index_z_plus=cell_index_z_plus+1
 
-        for vertexii=1:8
-            den_atomii          +=  mesh.vertexes[vertex_[vertexii]]*pic[vertexii]
-            densgrads_atomii[1]    +=   mesh.densgrads[vertex_[vertexii],1] * pic[vertexii]
-            densgrads_atomii[2]    +=   mesh.densgrads[vertex_[vertexii],2] * pic[vertexii]
-            densgrads_atomii[3]    +=   mesh.densgrads[vertex_[vertexii],3] * pic[vertexii]
-        end
+        energy[atomii]+=grids[cell_index_x,cell_index_y,cell_index_z]                *pic[1]*1/(avg_den*hPF.κ)
+        energy[atomii]+=grids[cell_index_x,cell_index_y_plus,cell_index_z]           *pic[2]*1/(avg_den*hPF.κ)
+        energy[atomii]+=grids[cell_index_x,cell_index_y_plus,cell_index_z_plus]      *pic[3]*1/(avg_den*hPF.κ)
+        energy[atomii]+=grids[cell_index_x,cell_index_y,cell_index_z_plus]           *pic[4]*1/(avg_den*hPF.κ)
+        energy[atomii]+=grids[cell_index_x_plus,cell_index_y,cell_index_z]           *pic[5]*1/(avg_den*hPF.κ)
+        energy[atomii]+=grids[cell_index_x_plus,cell_index_y,cell_index_z_plus]      *pic[6]*1/(avg_den*hPF.κ)
+        energy[atomii]+=grids[cell_index_x_plus,cell_index_y_plus,cell_index_z]      *pic[7]*1/(avg_den*hPF.κ)
+        energy[atomii]+=grids[cell_index_x_plus,cell_index_y_plus,cell_index_z_plus] *pic[8]*1/(avg_den*hPF.κ)
+        energy[atomii]-=1/hPF.κ
 
-        energy[atomii] += 1/hPF.κ*(den_atomii-avg_den)/avg_den
+        forces[atomii].force[1]+=  grid_grad_x[cell_index_x,cell_index_y,cell_index_z]                *pic[1]
+        forces[atomii].force[1]+=  grid_grad_x[cell_index_x,cell_index_y_plus,cell_index_z]           *pic[2]
+        forces[atomii].force[1]+=  grid_grad_x[cell_index_x,cell_index_y_plus,cell_index_z_plus]      *pic[3]
+        forces[atomii].force[1]+=  grid_grad_x[cell_index_x,cell_index_y,cell_index_z_plus]           *pic[4]
+        forces[atomii].force[1]+=  grid_grad_x[cell_index_x_plus,cell_index_y,cell_index_z]           *pic[5]
+        forces[atomii].force[1]+=  grid_grad_x[cell_index_x_plus,cell_index_y,cell_index_z_plus]      *pic[6]
+        forces[atomii].force[1]+=  grid_grad_x[cell_index_x_plus,cell_index_y_plus,cell_index_z]      *pic[7]
+        forces[atomii].force[1]+=  grid_grad_x[cell_index_x_plus,cell_index_y_plus,cell_index_z_plus] *pic[8]
 
-        forces[atomii].force[1] += -1 / hPF.κ * densgrads_atomii[1]/avg_den
-        forces[atomii].force[2] += -1 / hPF.κ * densgrads_atomii[2]/avg_den
-        forces[atomii].force[3] += -1 / hPF.κ * densgrads_atomii[3]/avg_den
+        forces[atomii].force[2]+=  grid_grad_y[cell_index_x,cell_index_y,cell_index_z]                *pic[1]
+        forces[atomii].force[2]+=  grid_grad_y[cell_index_x,cell_index_y_plus,cell_index_z]           *pic[2]
+        forces[atomii].force[2]+=  grid_grad_y[cell_index_x,cell_index_y_plus,cell_index_z_plus]      *pic[3]
+        forces[atomii].force[2]+=  grid_grad_y[cell_index_x,cell_index_y,cell_index_z_plus]           *pic[4]
+        forces[atomii].force[2]+=  grid_grad_y[cell_index_x_plus,cell_index_y,cell_index_z]           *pic[5]
+        forces[atomii].force[2]+=  grid_grad_y[cell_index_x_plus,cell_index_y,cell_index_z_plus]      *pic[6]
+        forces[atomii].force[2]+=  grid_grad_y[cell_index_x_plus,cell_index_y_plus,cell_index_z]      *pic[7]
+        forces[atomii].force[2]+=  grid_grad_y[cell_index_x_plus,cell_index_y_plus,cell_index_z_plus] *pic[8]
+
+        forces[atomii].force[3]+=  grid_grad_z[cell_index_x,cell_index_y,cell_index_z]                *pic[1]
+        forces[atomii].force[3]+=  grid_grad_z[cell_index_x,cell_index_y_plus,cell_index_z]           *pic[2]
+        forces[atomii].force[3]+=  grid_grad_z[cell_index_x,cell_index_y_plus,cell_index_z_plus]      *pic[3]
+        forces[atomii].force[3]+=  grid_grad_z[cell_index_x,cell_index_y,cell_index_z_plus]           *pic[4]
+        forces[atomii].force[3]+=  grid_grad_z[cell_index_x_plus,cell_index_y,cell_index_z]           *pic[5]
+        forces[atomii].force[3]+=  grid_grad_z[cell_index_x_plus,cell_index_y,cell_index_z_plus]      *pic[6]
+        forces[atomii].force[3]+=  grid_grad_z[cell_index_x_plus,cell_index_y_plus,cell_index_z]      *pic[7]
+        forces[atomii].force[3]+=  grid_grad_z[cell_index_x_plus,cell_index_y_plus,cell_index_z_plus] *pic[8]
+
     end
    
 end
 
-function apply_nonbonds!(args::system,atoms::Vector{atom},forces::Vector{force},energy::Vector{Float64},hPF::OriginalhPFInteractions)
+
+function apply_nonbonds!(args::system,atoms::Vector{atom},forces::Vector{force},energy::Vector{Float64},hPF::NonBondInteraction)
+
     clear_mesh!(hPF.mesh)
     for atomii=1:length(atoms)
         cloudincell!(atoms[atomii].pos,hPF.mesh)
     end
-    DensityatVertex!(hPF.mesh)
-    Grad_DensVertex!(hPF.mesh)
     ParticleFieldInteraction!(atoms,forces,energy,hPF.mesh,hPF)
 end
-

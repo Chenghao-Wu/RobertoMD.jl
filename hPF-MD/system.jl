@@ -43,6 +43,7 @@ struct NoLogger <: Logger end
 struct NoTrajectoryDump <: TrajectoryDump end
 
 mutable struct system
+    initial_velocity::AbstractString
     dt::Float64
     temp::Float64 
     steps::Int64
@@ -64,6 +65,7 @@ mutable struct system
 end
 
 function sys_init()
+    initial_velocity="Gaussian"
     dt=0.0
     temp=0.0
     logfreq=0
@@ -82,7 +84,7 @@ function sys_init()
     logger=NoLogger()
     trajectorydump=NoTrajectoryDump()
     firststep=true
-    return system(dt,temp,steps,logfreq,logfile,logmode,trjdumpfreq,trjdumpfile,trjdumpmode,box,data_file,data_format,thermostat,bondinteraction,nonbondinteraction,logger,trajectorydump,firststep)
+    return system(initial_velocity,dt,temp,steps,logfreq,logfile,logmode,trjdumpfreq,trjdumpfile,trjdumpmode,box,data_file,data_format,thermostat,bondinteraction,nonbondinteraction,logger,trajectorydump,firststep)
 end
 
 function read_data(filename::AbstractString,format::AbstractString)
@@ -103,8 +105,8 @@ function read_data(filename::AbstractString,format::AbstractString)
     angles_=Vector{angle}(undef,number_angles)
     
     for atomii =1:number_atoms
-        type_=1
         atomi_=Atom(frame,atomii-1) # question about the atom index?
+        type_=parse(Int64, type(atomi_))
         massi_=mass(atomi_)
         chargei_=charge(atomi_)
         current_pos=pos[1:3,atomii] .- center_pos # nanometer
@@ -155,14 +157,16 @@ function run_hPFMD(args::system)
     firststep=args.firststep
 
     # initialize veclocities!
-    velociy_init=false
-    if velociy_init==false
+
+    if args.initial_velocity=="zero"
         velocities_=velocities_
-    else
+    elseif args.initial_velocity=="Gaussian"
         for velocityii=1:length(velocities_)
             d = Normal(0.0, sqrt(args.temp/atoms_[velocityii].mass))
             velocities_[velocityii]=velocity(rand(d,3))
         end
+    else
+        println("Please set the mode for initial velocity")
     end
 
     logger_file = open(args.logfile, args.logmode)
