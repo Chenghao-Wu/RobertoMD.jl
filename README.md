@@ -1,5 +1,10 @@
-# hPF-MD.jl
+
+ <img src="hPF_blockcopolymer.gif" width="120" height="120" />
+
+# hPF-MD.jl 
 ## Hybrid Particle-Field Molecular Dynamics Simulation implemented in Julia
+
+
 
 ![hPF-MD](hPF-MD.png)
 
