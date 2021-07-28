@@ -8,7 +8,7 @@
 
 ![hPF-MD](hPF-MD.png)
 
-(This code is not fully benchmarked and finished.)
+(This code is not fully benchmarked and finished. **A new version will be released soon**)
 
 hPF-MD.jl is a hybrid particle-field molecular-dynamics simulation package written in Julia. It features a non-pairwise fashion to describe the non-bonded interactions between particles.
 
