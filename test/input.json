@@ -1,0 +1,27 @@
+{
+    "dt": 0.01,
+    "harmonic bond":{
+        "k": 2.0,
+        "l0": 2.0
+      },
+    "thermofreq":100,
+    "zero velocity":true,
+    "steps":1000,
+    "velocity verlet":true,
+    "BerendsenNVT":{
+      "tau":1.0
+    },
+    "Canonical field":{
+      "χ":{
+        "1":[0.0,0.0],
+        "2":[0.0,0.0]
+      },
+      "κ":1.0,
+      "uniform mesh":true,
+      "update":1,
+      "Lcell":1.0
+    }
+}
+
+
+  
