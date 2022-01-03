@@ -23,6 +23,7 @@ mutable struct System
     current_step::Int64
     current_temp::Float64
     dim::Int64
+    trjdump::Dump
 
     commsizes::Array{Int64,1}
     bond_commsizes::Array{Int64,1}
@@ -46,6 +47,8 @@ mutable struct System
     energies::Array{Float64,1}
     bonds::Array{Int64,2}
     normal::Normal{Float64}
+    coords_all::Array{Float64,2}
+    types_all::Array{Int64,1}
     # Initialize Constructor
     function System(input::Dict,config::Dict,comm::MPI.Comm)
 
@@ -65,6 +68,7 @@ mutable struct System
         integrator=NoIntegrator()
         thermostat=NoThermostat()
         velocity=NoVelocity()
+        trjdump=NoDump()
 
         commsizes=zeros(Int64,0)
         bond_commsizes=zeros(Int64,0)
@@ -159,6 +163,12 @@ mutable struct System
                 
                 @info "Employing Canonical Field with Cell Length $(input["Canonical field"]["Lcell"]), Field Update every $(input["Canonical field"]["update"])"
             end
+
+            if "LAMMPSTrj" in keys(input)
+                filename=input["LAMMPSTrj"]["file"]
+                freq=input["LAMMPSTrj"]["freq"]
+                trjdump=LAMMPSTrj(filename,freq)
+            end
         end
         
         types=zeros(Int64,0)
@@ -168,6 +178,9 @@ mutable struct System
         forces=zeros(Float64,0,0)
         energies=zeros(Float64,0)
         bonds=zeros(Int64,0,0)
+        
+        coords_all=zeros(Float64,0,0)
+        types_all=zeros(Int64,0)
 
         new(dt::Float64,
             temp::Float64 ,
@@ -183,7 +196,7 @@ mutable struct System
             current_step::Int64,
             current_temp::Float64,
             dim::Int64,
-        
+            trjdump::Dump,
             commsizes::Array{Int64,1},
             bond_commsizes::Array{Int64,1},
         
@@ -205,7 +218,9 @@ mutable struct System
             forces::Array{Float64,2},
             energies::Array{Float64,1},
             bonds::Array{Int64,2},
-            normal::Normal{Float64})
+            normal::Normal{Float64},
+            coords_all::Array{Float64,2},
+            types_all::Array{Int64,1})
 
     end
 end

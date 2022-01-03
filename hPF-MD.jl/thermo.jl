@@ -24,7 +24,7 @@ function UpdateMomentum!(sys::System,comm::MPI.Comm,root::Int64)
     momentum_tot=MPI.Allreduce(momentum_local, +, comm)
     if MPI.Comm_rank(comm)==root
         if sys.first_step || sys.current_step%sys.thermofreq==0.0
-            @show momentum_tot
+            @show momentum_tot/(sys.total_N*sys.dim-sys.dim)
         end
     end
 end

@@ -6,8 +6,9 @@ using .hPFMD
 control=Dict("dt"=>0.01,
             "thermofreq"=>100,
             "zero velocity"=>true,
-            "steps"=>10000,
+            "steps"=>1000,
             "velocity verlet"=>true,
+            "LAMMPSTrj"=>Dict("file"=>"test.lammpstrj","freq"=>1000),
             "LangevinNVT"=>Dict("gamma"=>10.0),
             "Canonical field"=>Dict(
             "χ"=>Dict("1"=>[0.0]),

@@ -4,6 +4,7 @@ export Simulate
 function Initialize!(sys::System,comm::MPI.Comm,root::Int64)
     CalculateForce!(sys,comm)
     #UpdateThermo!(sys,comm,root)
+    DumpInformation(sys,comm,root)
     sys.first_step=false
 end
 
@@ -28,6 +29,7 @@ function Simulate(inputs::Dict,config::Dict)
         sys.bond_commsizes=balancingMPI.bond_commsizes
         
         types=InitTypes(configuration,balancingMPI)
+        sys.types_all=types
         sys.num_atomtype=length(unique(types))
         sys.total_N=length(types)
         masses=InitMasses(configuration,balancingMPI)
@@ -47,6 +49,9 @@ function Simulate(inputs::Dict,config::Dict)
             sys.local_field=[zeros(sys.mesh.num_cells*sys.mesh.num_cells*sys.mesh.num_cells) for i in 1:sys.num_atomtype]
             sys.global_field=[zeros(sys.mesh.num_cells*sys.mesh.num_cells*sys.mesh.num_cells) for i in 1:sys.num_atomtype]
             sys.field_gradient=[zeros(sys.mesh.num_cells*sys.mesh.num_cells*sys.mesh.num_cells*3) for i in 1:sys.num_atomtype]
+        end
+        if sys.trjdump!=NoDump()
+            sys.coords_all=zeros(sys.total_N,3)
         end
     else
         sys=System(Dict(),Dict(),comm)
@@ -94,8 +99,8 @@ function Simulate(inputs::Dict,config::Dict)
         UpdateVelocity!(sys,sys.integrator,comm)
         MPI.Barrier(comm)
         Thermostat!(sys,comm,root)
-        
         MPI.Barrier(comm)
+        DumpInformation(sys,comm,root)
     end
     MPI.Finalize()
 end
