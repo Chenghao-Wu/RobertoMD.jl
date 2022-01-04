@@ -6,7 +6,7 @@ end
 
 function UpdatePosition!(sys::System,integrator::VVIntegrator)
     #sys.coords .+= sys.dt.*sys.vels.+integrator.hdtsqr .* sys.forces ./ sys.masses
-    @. UpdatePosition_particle!(sys.coords,sys.vels,sys.forces,sys.masses,sys.dt,integrator)
+    UpdatePosition_particle!.(sys.coords,sys.vels,sys.forces,sys.masses,sys.dt,integrator)
 end
 
 function UpdatePosition_particle!(  coords::Array{Float64,1},
@@ -22,7 +22,7 @@ end
 
 function UpdateVelocity!(sys::System,integrator::VVIntegrator,comm::MPI.Comm)
     #sys.vels .+= 0.5 .* sys.dt .* sys.forces ./ sys.masses
-    @. UpdateVelocity_particle!(sys.vels,sys.forces,sys.masses,sys.dt,integrator)
+    UpdateVelocity_particle!.(sys.vels,sys.forces,sys.masses,sys.dt,integrator)
 end
 
 function UpdateVelocity_particle!(  vels::Array{Float64,1},

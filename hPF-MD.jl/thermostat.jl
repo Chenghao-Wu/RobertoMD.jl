@@ -11,13 +11,19 @@ function apply_thermostat!(sys::System,thermost::BerendsenNVT,comm::MPI.Comm,roo
         sys.current_temp[1]=1e-8
     end
     scalT  = sqrt(1.0+sys.dt*(sys.temp/sys.current_temp[1]-1.0)/thermost.τ)
-    for atomii=1:sys.local_N
-        @fastmath @inbounds begin
-        sys.vels[atomii,1] = sys.vels[atomii,1] .* scalT
-        sys.vels[atomii,2] = sys.vels[atomii,2] .* scalT
-        sys.vels[atomii,3] = sys.vels[atomii,3] .* scalT
-        end
-    end 
+    apply_thermostat_particle!.(sys.vels,sys.forces,sys.masses,scalT,sys.dt,Ref(thermost))
+    #@show sys.forces
+end
+
+function apply_thermostat_particle!(vels::Array{Float64,1},
+                                    forces::Array{Float64,1},
+                                    masses::Float64,
+                                    scalT::Float64,
+                                    dt::Float64,
+                                    thermost::BerendsenNVT)
+    vels[1] = vels[1] * scalT
+    vels[2] = vels[2] * scalT
+    vels[3] = vels[3] * scalT
 end
 
 function apply_thermostat!(sys::System,thermost::LangevinNVT,comm::MPI.Comm,root::Int64)
@@ -25,7 +31,12 @@ function apply_thermostat!(sys::System,thermost::LangevinNVT,comm::MPI.Comm,root
     apply_thermostat_particle!.(sys.vels,sys.forces,sys.masses,coeff,sys.dt,Ref(thermost))
 end
 
-function apply_thermostat_particle!(vels::Array{Float64,1},forces::Array{Float64,1},masses::Float64,coeff::Float64,dt::Float64,thermost::LangevinNVT)
+function apply_thermostat_particle!(vels::Array{Float64,1},
+                                    forces::Array{Float64,1},
+                                    masses::Float64,
+                                    coeff::Float64,
+                                    dt::Float64,
+                                    thermost::LangevinNVT)
     r_force_x = RandomNumber()*coeff - thermost.gamma*vels[1]
     r_force_y = RandomNumber()*coeff - thermost.gamma*vels[2]
     r_force_z = RandomNumber()*coeff - thermost.gamma*vels[3]

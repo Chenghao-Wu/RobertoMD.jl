@@ -8,23 +8,23 @@ control=Dict("dt"=>0.01,
             "zero velocity"=>true,
             "steps"=>1000,
             "velocity verlet"=>true,
-            "LAMMPSTrj"=>Dict("file"=>"test.lammpstrj","freq"=>1000),
-            "LangevinNVT"=>Dict("gamma"=>10.0),
+            "LAMMPSTrj"=>Dict("file"=>"monoliquid.lammpstrj","freq"=>1000),
+            "BerendsenNVT"=>Dict("tau"=>1.0),
             "Canonical field"=>Dict(
             "χ"=>Dict("1"=>[0.0]),
             "κ"=>0.1,
             "uniform mesh"=>true,
-            "update"=>100,
+            "update"=>1,
             "Lcell"=>1.0))
 
 
 Waters=Dict()
-for i in 1:10000
-    Waters[string(i)]=Dict("atoms"=>Dict("1"=>Dict("type"=>1,"mass"=>1,"coords"=>rand(Float64, 3)*10)))
+for i in 1:10
+    Waters[string(i)]=Dict("atoms"=>Dict("1"=>Dict("type"=>1,"mass"=>1,"coords"=>rand(Float64, 3)*4)))
 end
 
 configs=Dict(
-    "box"=>[10.0,10.0,10.0],
+    "box"=>[5.0,5.0,5.0],
     "molecules"=>Waters
     )
 

@@ -1,11 +1,19 @@
 
+function DeSerializeAllCoord!(sys::System,array::Array{Float64,1})
+    for i in 0:div(size(array)[1],3)-1
+        sys.coords_all[i+1,1]=array[i*3+1]
+        sys.coords_all[i+1,2]=array[i*3+2]
+        sys.coords_all[i+1,3]=array[i*3+3]
+    end
+end
+
 function DumpInformation(sys::System,comm::MPI.Comm,root::Int64)
     MPI.Barrier(comm)
     
     if sys.trjdump!=NoDump()
         coords_all=SerializeArray(sys.coords_all)
         MPI.Gatherv!(SerializeArray(sys.coords),VBuffer(coords_all,sys.commsizes*3),root,comm)
-        sys.coords_all=DeSerializeArray(coords_all)
+        DeSerializeAllCoord!(sys,coords_all)
         if MPI.Comm_rank(comm)==root
             DumpTrajectory(sys,sys.trjdump)
         end
@@ -14,10 +22,10 @@ function DumpInformation(sys::System,comm::MPI.Comm,root::Int64)
 end
 
 function DumpTrajectory(sys::System,dump::LAMMPSTrj)
-    if sys.first_step || sys.current_step%dump.freq==0
+    if sys.first_step[1] || sys.current_step[1]%dump.freq==0
         string_out="ITEM: TIMESTEP"
         string_out*="\n"
-        string_out*=string(sys.current_step)
+        string_out*=string(sys.current_step[1])
         string_out*="\n"
         string_out*="ITEM: NUMBER OF ATOMS"
         string_out*="\n"

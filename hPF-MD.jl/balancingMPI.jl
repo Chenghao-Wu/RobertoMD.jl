@@ -9,6 +9,16 @@ function SerializeArray(array::Array{Float64,2})
     return out
 end
 
+function SerializeArray(array::Array{Array{Float64,1}})
+    out=zeros(length(array)*3)
+    for i in 0:length(array)-1
+        out[i*3+1]=array[i+1][1]
+        out[i*3+2]=array[i+1][2]
+        out[i*3+3]=array[i+1][3]
+    end
+    return out
+end
+
 function SerializeArray(array::Array{Int,2})
     out=zeros(Int64,size(array)[1]*3)
     for i in 0:size(array)[1]-1
@@ -31,6 +41,7 @@ function DeSerializeArray(array::Array{Float64,1})
     end
     return out
 end
+
 
 function DeSerializeArray(array::Array{Int64,1})
     out=zeros(Int64,div(size(array)[1],3),3)

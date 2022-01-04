@@ -4,7 +4,7 @@ export Simulate
 function Initialize_MD!(sys::System,comm::MPI.Comm,root::Int64)
     CalculateForce!(sys,comm)
     UpdateThermo!(sys,comm,root)
-    #DumpInformation(sys,comm,root)
+    DumpInformation(sys,comm,root)
     sys.first_step[1]=false
 end
 
@@ -115,7 +115,7 @@ function Simulate(inputs::Dict,config::Dict)
         MPI.Barrier(comm)
         Thermostat!(sys,comm,root)
         MPI.Barrier(comm)
-        #DumpInformation(sys,comm,root)
+        DumpInformation(sys,comm,root)
         if my_rank==root
             ProgressMeter.next!(p)
         end

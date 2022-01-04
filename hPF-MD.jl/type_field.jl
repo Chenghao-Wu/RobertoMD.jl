@@ -41,11 +41,10 @@ struct UniformMesh <:Mesh
         simulation_length=pbc.Lx
         V_cell=real_Lcell*real_Lcell*real_Lcell
         mesh_index=Array{Array{Int64,1},1}(undef,0)
-
         for icell=0:num_cells-2
             for jcell=0:num_cells-2
                 for kcell=0:num_cells-2 
-                    push!([icell,jcell,kcell])
+                    push!(mesh_index,[icell,jcell,kcell])
                 end
             end
         end
