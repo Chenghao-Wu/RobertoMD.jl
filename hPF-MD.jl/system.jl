@@ -7,7 +7,7 @@ function ReadInput(filename::String)
     return inputs
 end
 
-mutable struct System
+struct System
     # User Inputs Simulation Setup
     dt::Float64
     temp::Float64 
@@ -19,12 +19,11 @@ mutable struct System
     field::Field
     mesh::Mesh
     velocity::Velocity
-    first_step::Bool
-    current_step::Int64
-    current_temp::Float64
+    first_step::Array{Bool,1}
+    current_step::Array{Int64,1}
+    current_temp::Array{Float64,1}
     dim::Int64
     trjdump::Dump
-
     commsizes::Array{Int64,1}
     bond_commsizes::Array{Int64,1}
 
@@ -34,24 +33,32 @@ mutable struct System
     local_field::Array{Array{Float64,1},1}
     global_field::Array{Array{Float64,1},1}
     field_gradient::Array{Array{Float64,1},1}
-    particle2cell::Array{Float64,2}
+    particle2cell::Array{Array{Float64,1},1}
     cellindex::Array{Array{Int64,2},1}
 
     total_N::Int64
     local_N::Int64
+    
     types::Array{Int64,1}
     masses::Array{Float64,1}
-    coords::Array{Float64,2}
-    vels::Array{Float64,2}
-    forces::Array{Float64,2}
+    coords::Vector{Array{Float64,1}}
+    vels::Vector{Array{Float64,1}}
+    forces::Vector{Array{Float64,1}}
     energies::Array{Float64,1}
-    bonds::Array{Int64,2}
+    bonds::Vector{Array{Int64,1}}
+
     normal::Normal{Float64}
+
     coords_all::Array{Float64,2}
     types_all::Array{Int64,1}
+    masses_all::Array{Float64,1}
+    vels_all::Array{Float64,2}
+    forces_all::Array{Float64,2}
+    energies_all::Array{Float64,1}
+    bonds_all::Array{Int64,2}
+
     # Initialize Constructor
     function System(input::Dict,config::Dict,comm::MPI.Comm)
-
         # define the root worker
         root = 0
         # local worker ID 
@@ -77,15 +84,16 @@ mutable struct System
         total_N=0
         num_atomtype=0
         local_N=0
-        first_step=true
-        current_step=1
-        current_temp=0.0
+        first_step=[true]
+        current_step=[1]
+        current_temp=[0.0]
 
         local_field=[zeros(0)]
         global_field=[zeros(0)]
         field_gradient=[zeros(0)]
-        particle2cell=zeros(0,0)
-        cellindex=[zeros(Int64,0,0)]
+        
+        particle2cell=Array{Array{Float64,1},1}(undef,0)
+        cellindex=Array{Array{Int64,2},1}(undef,0)
 
         normal=Normal()
 
@@ -97,6 +105,22 @@ mutable struct System
         configuration=Configuration(Dict())
         balancingMPI=BalancingMPI(configuration,comm_size)
         
+        types=Vector{Int64}(undef,0)
+        masses=Vector{Float64}(undef,0)
+        coords=Array{Array{Float64,1},1}(undef,0)
+        vels=Array{Array{Float64,1},1}(undef,0)
+        forces=Array{Array{Float64,1},1}(undef,0)
+        energies=Vector{Float64}(undef,0)
+        bonds=Vector{Vector{Int64}}(undef,0)
+        
+        coords_all=zeros(Float64,0,0)
+        types_all=zeros(Int64,0)
+        masses_all=zeros(Float64,0)
+        vels_all=zeros(Float64,0,0)
+        forces_all=zeros(Float64,0,0)
+        energies_all=zeros(Float64,0)
+        bonds_all=zeros(Int64,0,0)
+
         if my_rank==root
             
             if "dt" in keys(input)
@@ -104,7 +128,7 @@ mutable struct System
                 @info "Timestep dt: $(dt)"
             end
             if "start" in keys(input)
-                current_step=input["start"]
+                current_step[1]=input["start"]
                 @info "Start Step dt: $(current_step)"
             end
             if "temp" in keys(input)
@@ -169,18 +193,41 @@ mutable struct System
                 freq=input["LAMMPSTrj"]["freq"]
                 trjdump=LAMMPSTrj(filename,freq)
             end
+
+            configuration=Configuration(config)
+            balancingMPI=BalancingMPI(configuration,MPI.Comm_size(comm))
+
+            pbc=PBC(;xhi=configuration.box[1],yhi=configuration.box[2],zhi=configuration.box[3])
+            rho0=sum(balancingMPI.commsizes)/(pbc.Lx^3)
+            commsizes=balancingMPI.commsizes
+            bond_commsizes=balancingMPI.bond_commsizes
+            
+            types_all=InitTypes(configuration,balancingMPI)
+            num_atomtype=length(unique(types_all))
+
+            total_N=length(types_all)
+            masses_all=InitMasses(configuration,balancingMPI)
+            coords_all=InitCoords(configuration,balancingMPI)
+            forces_all=InitForces(configuration)
+            energies_all=InitEnergies(configuration)
+            vels_all=InitVels(configuration,velocity)
+            if bdinter!=NoBond
+                bonds_all=InitBonds(configuration,balancingMPI)
+            end
+            if field!=NoField()
+                if "uniform mesh" in keys(input["Canonical field"])
+                    mesh=UniformMesh(pbc,input["Canonical field"]["Lcell"])
+                end
+
+                local_field=[zeros(mesh.num_cells*mesh.num_cells*mesh.num_cells) for i in 1:num_atomtype]
+                global_field=[zeros(mesh.num_cells*mesh.num_cells*mesh.num_cells) for i in 1:num_atomtype]
+                field_gradient=[zeros(mesh.num_cells*mesh.num_cells*mesh.num_cells*3) for i in 1:num_atomtype]
+
+                #particle2cell=zeros(maximum(commsizes),8)
+                #cellindex=[zeros(Int64,8,3) for i in 1:maximum(commsizes)]
+            end
         end
         
-        types=zeros(Int64,0)
-        masses=zeros(Float64,0)
-        coords=zeros(Float64,0,0)
-        vels=zeros(Float64,0,0)
-        forces=zeros(Float64,0,0)
-        energies=zeros(Float64,0)
-        bonds=zeros(Int64,0,0)
-        
-        coords_all=zeros(Float64,0,0)
-        types_all=zeros(Int64,0)
 
         new(dt::Float64,
             temp::Float64 ,
@@ -192,9 +239,9 @@ mutable struct System
             field::Field,
             mesh::Mesh,
             velocity::Velocity,
-            first_step::Bool,
-            current_step::Int64,
-            current_temp::Float64,
+            first_step::Array{Bool,1},
+            current_step::Array{Int64,1},
+            current_temp::Array{Float64,1},
             dim::Int64,
             trjdump::Dump,
             commsizes::Array{Int64,1},
@@ -206,21 +253,28 @@ mutable struct System
             local_field::Array{Array{Float64,1},1},
             global_field::Array{Array{Float64,1},1},
             field_gradient::Array{Array{Float64,1},1},
-            particle2cell::Array{Float64,2},
+            particle2cell::Array{Array{Float64,1},1},
             cellindex::Array{Array{Int64,2},1},
         
             total_N::Int64,
             local_N::Int64,
+
             types::Array{Int64,1},
             masses::Array{Float64,1},
-            coords::Array{Float64,2},
-            vels::Array{Float64,2},
-            forces::Array{Float64,2},
+            coords::Vector{Array{Float64,1}},
+            vels::Vector{Array{Float64,1}},
+            forces::Vector{Array{Float64,1}},
             energies::Array{Float64,1},
-            bonds::Array{Int64,2},
-            normal::Normal{Float64},
-            coords_all::Array{Float64,2},
-            types_all::Array{Int64,1})
+            bonds::Vector{Array{Int64,1}},
 
+            normal::Normal{Float64},
+
+            coords_all::Array{Float64,2},
+            types_all::Array{Int64,1},
+            masses_all::Array{Float64,1},
+            vels_all::Array{Float64,2},
+            forces_all::Array{Float64,2},
+            energies_all::Array{Float64,1},
+            bonds_all::Array{Int64,2})
     end
 end

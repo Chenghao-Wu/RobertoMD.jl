@@ -1,5 +1,7 @@
 abstract type Integrator end
 
+Base.broadcastable(x::Integrator) = Ref(x)
+
 struct NoIntegrator <: Integrator end
 
 struct VVIntegrator <: Integrator 

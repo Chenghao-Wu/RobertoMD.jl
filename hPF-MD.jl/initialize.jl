@@ -87,3 +87,5 @@ function InitEnergies(configuration::Configuration)
     @info "Initialize Energy Size $(n_total)"
     return energies
 end
+
+
