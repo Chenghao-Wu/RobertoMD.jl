@@ -155,14 +155,6 @@ function grad_field_vertex!(coord_cell::Array{Int64,1},
     field_gradient[SerializeCellGradIndex(icell_,jcell_,kcell_,3,num_cells)] += 0.5*g_z
 end
 
-function grad_field!(sys::System)
-    for i in 1:sys.num_atomtype
-        grad_field_vertex!.(sys.mesh.mesh_index,Ref(sys.global_field[i]),Ref(sys.field_gradient[i]),sys.mesh.num_cells)
-    end
-    
-    
-end
-
 function force_field_particle!(forces::Array{Float64,1},
                                 types::Int64,
                                 particle2cell::Array{Float64,1},
@@ -205,7 +197,9 @@ function force_field!(sys::System,field::CanonicalField,comm::MPI.Comm)
         for i in 1:sys.num_atomtype
             MPI.Allreduce!(sys.local_field[i],sys.global_field[i],sum_mesh,comm)
         end
-        grad_field!(sys)
+        for i in 1:sys.num_atomtype
+            grad_field_vertex!.(sys.mesh.mesh_index,Ref(sys.global_field[i]),Ref(sys.field_gradient[i]),sys.mesh.num_cells)
+        end
     else
         perparticle2cell!.( sys.coords,
                             sys.particle2cell,
