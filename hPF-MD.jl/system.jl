@@ -22,6 +22,11 @@ struct System
     first_step::Array{Bool,1}
     current_step::Array{Int64,1}
     current_temp::Array{Float64,1}
+    current_momentum::Array{Float64,1}
+
+    thermologger::Logger
+    thermo_info::Array{Array{Float64,1}}
+
     dim::Int64
     trjdump::Dump
     commsizes::Array{Int64,1}
@@ -66,6 +71,7 @@ struct System
         comm_size=MPI.Comm_size(comm)
 
         # Initialize Simulation Setup
+        start_step=1
         dt=0.005
         temp=1.0
         steps=100
@@ -87,6 +93,7 @@ struct System
         first_step=[true]
         current_step=[1]
         current_temp=[0.0]
+        current_momentum=[0.0]
 
         local_field=[zeros(0)]
         global_field=[zeros(0)]
@@ -96,6 +103,9 @@ struct System
         cellindex=Array{Array{Int64,2},1}(undef,0)
 
         normal=Normal()
+
+        thermologger=NoLogger()
+        thermo_info=Array{Array{Float64,1},1}(undef,0)
 
         rho0=0.0
 
@@ -141,6 +151,44 @@ struct System
             end
             if "thermofreq" in keys(input)
                 thermofreq=input["thermofreq"]
+                @info "Log Thermo Information Every: $(thermofreq)"
+            end
+
+            if "thermo information" in keys(input)
+                L=2
+                energy_=false
+                momentum_=false
+                write_=false
+                file_=""
+                for i in 1:length(keys(input["thermo information"]))
+                    if "energy" in keys(input["thermo information"])
+                        if input["thermo information"]["energy"]
+                            energy_=true
+                            L+=1
+                        end
+                    end
+                    if "momentum" in keys(input["thermo information"])
+                        if input["thermo information"]["momentum"]
+                            momentum_=true
+                            L+=1
+                        end
+                    end
+                    if "write" in keys(input["thermo information"])
+                        write_=input["thermo information"]["write"]
+                    end
+                    if "file" in keys(input["thermo information"])
+                        file_=input["thermo information"]["file"]
+                    end
+                end
+                thermologger=ThermoLogger(Energy=energy_,Momentum=momentum_,Write=write_,File=file_)
+
+                push!(thermo_info,zeros(L))
+                for stepi in start_step:steps
+                    if stepi%thermofreq==0.0
+                        push!(thermo_info,zeros(L))
+                    end
+                end
+                
                 @info "Log Thermo Information Every: $(thermofreq)"
             end
 
@@ -250,6 +298,10 @@ struct System
             first_step::Array{Bool,1},
             current_step::Array{Int64,1},
             current_temp::Array{Float64,1},
+            current_momentum::Array{Float64,1},
+            thermologger::Logger,
+            thermo_info::Array{Array{Float64,1}},
+
             dim::Int64,
             trjdump::Dump,
             commsizes::Array{Int64,1},

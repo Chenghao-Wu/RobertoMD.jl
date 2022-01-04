@@ -15,7 +15,11 @@ control=Dict("dt"=>0.01,
             "κ"=>0.1,
             "uniform mesh"=>true,
             "update"=>1,
-            "Lcell"=>1.0))
+            "Lcell"=>1.0),
+            "thermo information"=>Dict( "energy"=>true,
+                                       "momentum"=>true,
+                                       "write"=>true,
+                                        "file"=>"monoliquid.log"))
 
 
 Waters=Dict()

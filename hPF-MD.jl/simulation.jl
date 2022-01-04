@@ -5,6 +5,7 @@ function Initialize_MD!(sys::System,comm::MPI.Comm,root::Int64)
     CalculateForce!(sys,comm)
     UpdateThermo!(sys,comm,root)
     DumpInformation(sys,comm,root)
+    LoggerInformation!(sys,comm,root)
     sys.first_step[1]=false
 end
 
@@ -100,7 +101,7 @@ function Simulate(inputs::Dict,config::Dict)
     #@show sys.bonds
     # Main Algorithm
     Initialize_MD!(sys,comm,root)
-    #
+    
     for stepi in sys.current_step[1]+1:sys.current_step[1]+sys.steps
         sys.current_step[1]=stepi
         UpdatePosition!(sys,sys.integrator)
@@ -119,6 +120,7 @@ function Simulate(inputs::Dict,config::Dict)
         if my_rank==root
             ProgressMeter.next!(p)
         end
+        LoggerInformation!(sys,comm,root)
     end
     MPI.Finalize()
 end

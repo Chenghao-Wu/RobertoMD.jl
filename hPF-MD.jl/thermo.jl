@@ -16,20 +16,11 @@ function UpdateTemperature!(sys::System,comm::MPI.Comm,root::Int64)
     MPI.Barrier(comm)
     temp=Ktot*2/(sys.total_N*sys.dim-sys.dim)
     sys.current_temp[1]=temp
-    if MPI.Comm_rank(comm)==root
-        if sys.first_step[1] || sys.current_step[1]%sys.thermofreq==0.0
-            @show sys.current_step[1],temp
-        end
-    end
 end
 
 function UpdateMomentum!(sys::System,comm::MPI.Comm,root::Int64)
     momentum_local = sum(sys.vels .* sys.masses)
     momentum_tot=MPI.Allreduce(momentum_local, +, comm)
-    if MPI.Comm_rank(comm)==root
-        if sys.first_step[1] || sys.current_step[1]%sys.thermofreq==0.0
-            momentum_particle=momentum_tot/(sys.total_N*sys.dim-sys.dim)
-            @show momentum_particle
-        end
-    end
+    momentum_particle=momentum_tot/(sys.total_N*sys.dim-sys.dim)
+    sys.current_momentum[1]=momentum_particle[1]+momentum_particle[2]+momentum_particle[3]
 end
