@@ -22,8 +22,10 @@ function LoggerThermo!(sys::System,comm::MPI.Comm,root::Int64)
         sys.thermologger.index[1]+=1
     end
     if sys.current_step[1]%sys.steps==0.0
-        if sys.thermologger.Write
-            write_log(sys,sys.thermologger)
+        if MPI.Comm_rank(comm)==root
+            if sys.thermologger.Write
+                write_log(sys,sys.thermologger)
+            end
         end
     end
 end
