@@ -1,13 +1,15 @@
 export Harmonic
 
 abstract type BdInter end
-
+Base.broadcastable(x::BdInter) = Ref(x)
 struct NoBond<:BdInter end
 
 struct Harmonic<:BdInter
-    k::Float64
-    l0::Float64
-    function Harmonic(k::Float64,l0::Float64)
-        new(k::Float64,l0::Float64)
+    k::Array{Float64,1}
+    l0::Array{Float64,1}
+    function Harmonic(  k::Array{Float64,1},
+                        l0::Array{Float64,1})
+        new(k::Array{Float64,1},
+            l0::Array{Float64,1})
     end
 end

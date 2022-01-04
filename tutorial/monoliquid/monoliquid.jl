@@ -28,4 +28,4 @@ configs=Dict(
     "molecules"=>Waters
     )
 
-@time Simulate(control,configs)
+Simulate(control,configs)

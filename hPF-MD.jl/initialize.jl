@@ -54,13 +54,17 @@ function InitBonds(configuration::Configuration,balancingMPI::BalancingMPI)
     bonds=zeros(Int64,n_total,3)
     index=1
     for comm_mole_i in balancingMPI.mole_index_comms
+        total_atom_index=0
         for mole_i in comm_mole_i
             molecule=configuration.moles[mole_i]
-            mole_length=size(molecule.bonds)[1]
-            if mole_length!=0
-                bonds[index:mole_length+index-1,1:3]=molecule.bonds
+            bond_length=size(molecule.bonds)[1]
+            mole_length=size(molecule.coords)[1]
+            if bond_length!=0
+                bonds[index:bond_length+index-1,1]=molecule.bonds[:,1]
+                bonds[index:bond_length+index-1,2:3]=molecule.bonds[:,2:3].+total_atom_index
             end
-            index=index+mole_length
+            total_atom_index+=mole_length
+            index=index+bond_length
         end
     end
     @info "Initialize Bonds Size $(n_total)"

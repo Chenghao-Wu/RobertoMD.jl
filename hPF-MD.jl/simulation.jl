@@ -88,7 +88,7 @@ function Simulate(inputs::Dict,config::Dict)
     else
         local_bonds=zeros(Int64,0,0)
     end
-
+    
     Initialize_LocalSystem!(sys,
                             local_types,
                             local_masses,
@@ -97,7 +97,7 @@ function Simulate(inputs::Dict,config::Dict)
                             local_forces,
                             local_vels,
                             local_bonds)
-    
+    #@show sys.bonds
     # Main Algorithm
     Initialize_MD!(sys,comm,root)
     #

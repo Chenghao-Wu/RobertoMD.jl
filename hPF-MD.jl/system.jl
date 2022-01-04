@@ -170,7 +170,15 @@ struct System
             end
 
             if "harmonic bond" in keys(input)
-                bdinter=Harmonic(input["harmonic bond"]["k"],input["harmonic bond"]["l0"])
+                k_matrix=zeros(length(keys(input["harmonic bond"]["k"])))
+                l0_matrix=zeros(length(keys(input["harmonic bond"]["l0"])))
+
+                for atomi in 1:length(keys(input["harmonic bond"]["k"]))
+                    k_matrix[atomi]=input["harmonic bond"]["k"][string(atomi)]
+                    l0_matrix[atomi]=input["harmonic bond"]["l0"][string(atomi)]
+                end
+                
+                bdinter=Harmonic(k_matrix,l0_matrix)
                 @info "Employing Harmonic Bond Potential with K= $(input["harmonic bond"]["k"]) and l0= $(input["harmonic bond"]["l0"])"
             end
 

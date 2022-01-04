@@ -3,6 +3,7 @@ module hPFMD
 
 using Formatting
 using Random, Distributions
+using RoundingIntegers
 using ProgressMeter
 using LinearAlgebra
 using Logging
