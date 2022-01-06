@@ -1,7 +1,5 @@
 
-push!(LOAD_PATH,"/home/zwq2834/mypackage/hPFMD")
-
-using hPFMD
+using RobertoMD
 
 control=Dict("dt"=>0.01,
             "zero velocity"=>true,
