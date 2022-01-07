@@ -111,6 +111,9 @@ struct System
                 if input["restart"]["JSONRestart"]
                     filename=input["restart"]["file"]
                     freq=input["restart"]["freq"]
+                    if freq==-1
+                        freq=Int(1e10)
+                    end
                     restart=JSONRestart(filename,freq)
                     
                 end
