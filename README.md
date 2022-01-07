@@ -1,4 +1,6 @@
-# hPFMD
+# RobertoMD
+
+RobertoMD.jl: Rome-Berlin-Tokyo Hybrid Particle-field Molecular-Dynamics Simulation
 
 A massively parallel hybrid particle-field molecular dynamics simulation package written in Julia
 
