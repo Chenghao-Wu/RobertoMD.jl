@@ -2,7 +2,7 @@
 
 RobertoMD.jl: Rome-Berlin-Tokyo Hybrid Particle-field Molecular-Dynamics Simulation
 
-A massively parallel hybrid particle-field molecular dynamics simulation package written in Julia. **It is aimed to become a productive hPF-MD simultor. However, it has not been at that stage yet**. Benchmarks and tests are welcome.
+A massively parallel hybrid particle-field molecular dynamics simulation package written in Julia. **It is aimed to become a productive hPF-MD simulator. However, it has not yet been reach that stage**. Benchmarks and tests are welcome.
 
 The implemeted functions are limited for now, including:
 
@@ -10,7 +10,7 @@ The implemeted functions are limited for now, including:
     * Particle-in-cell transformation
     * Periodic cubic fields (simulation box must be same in x,y,z directions)
 * Bond interactions: Harmonic
-* Thermostat: Langevin, Berendsen
+* Thermostats: Langevin, Berendsen
 * Velocity Verlet integration
 * Periodic boundary conditions in a cubic box.
 * Particle-decomposition parallelization (MPI.jl)
@@ -26,9 +26,9 @@ In short, the field is a function of the local particle density. This collective
 
 ## Usage
 
-Several example systems, e.g., **monoliquid**, **polymer melts**, **copolymer melt**, **polymer in solution**, can be found in Example folder:
+Several example systems, e.g., **monoliquid**, **polymer melt**, **copolymer melt**, **polymer in solution**, can be found in Example folder:
 
-This is the hPF-MD simulation of a simple block copolymer systems:
+This is the hPF-MD simulation of a simple block copolymer system:
 
 ```python
 using RobertoMD
