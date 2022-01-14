@@ -1,6 +1,6 @@
 # RobertoMD
 
-RobertoMD.jl: Rome-Berlin-Tokyo Hybrid Particle-field Molecular-Dynamics Simulation
+RobertoMD.jl ([JuliaCon2021](https://live.juliacon.org/talk/ECKGDE)): Rome-Berlin-Tokyo Hybrid Particle-field Molecular-Dynamics Simulation
 
 A massively parallel hybrid particle-field molecular dynamics simulation package written in Julia. **It is aimed to become a productive hPF-MD simulator. However, it has not yet been at that stage**. Benchmarks and tests are welcome.
 
